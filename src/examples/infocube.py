@@ -72,7 +72,7 @@ def get_openweather_data():
             return None, None, None, None
             
         r = requests.get(
-            f'https://openweathermap.org/data/2.5/weather?id=4791160&appid={WEATHER_APP_ID}&units=imperial',
+            f'https://api.openweathermap.org/data/2.5/weather?id=4791160&APPID={WEATHER_APP_ID}&units=imperial',
             headers={'Accept': 'application/json'})
         
         # Check if the request was successful

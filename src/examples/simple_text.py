@@ -3,8 +3,9 @@ import time
 import sys
 import os
 
-# Add parent directory to path so we can import our modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Get the project root directory
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.insert(0, project_root)
 
 from src.matrix_manager import MatrixManager
 from src.text_renderer import TextRenderer

@@ -85,7 +85,8 @@ def get_openweather_data():
         current = f"{round(j['main']['temp'])}°"
         lowest = str(round(j['main']['temp_min']))
         highest = str(round(j['main']['temp_max']))
-        icon = os.path.join(WEATHER_ICONS_DIR, f"{j['weather'][0]['icon']}.jpg")
+        icon = os.path.join('/home/pi/code/rpi-led-matrix/src/examples/images/weather-icons/', f"{j['weather'][0]['icon']}.jpg")
+        logger.info(icon)
         return current, lowest, highest, icon
     except Exception as e:
         logger.error(f"Error fetching weather data: {e}")

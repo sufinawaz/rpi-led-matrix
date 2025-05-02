@@ -120,7 +120,7 @@ def download_weather_icon(icon_code):
     # If the icon doesn't exist, download it from OpenWeatherMap
     try:
         # Construct the OpenWeatherMap icon URL
-        icon_url = f"http://openweathermap.org/img/wn/{icon_code}@2x.png"
+        icon_url = f"http://openweathermap.org/img/wn/{icon_code}.png"
         logger.info(f"Downloading weather icon: {icon_url}")
         
         # Download the icon

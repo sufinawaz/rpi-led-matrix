@@ -304,6 +304,8 @@ class InfoCube(SampleBase):
             if icon and os.path.exists(icon):
                 self.image = Image.open(icon).convert('RGB')
                 self.image.thumbnail((24, 24), Image.ANTIALIAS)
+            else:
+                logger.info('path does not exist to con')
             
             start_time = time.perf_counter()
             while True:

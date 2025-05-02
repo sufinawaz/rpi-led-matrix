@@ -74,6 +74,12 @@ def get_openweather_data():
         r = requests.get(
             f'https://openweathermap.org/data/2.5/weather?id=4791160&appid={WEATHER_APP_ID}&units=imperial',
             headers={'Accept': 'application/json'})
+        
+        # Check if the request was successful
+        if r.status_code != 200:
+            logger.error(f"Weather API returned status code {r.status_code}")
+            return None, None, None, None
+            
         j = r.json()
         current = f"{round(j['main']['temp'])}°"
         lowest = str(round(j['main']['temp_min']))

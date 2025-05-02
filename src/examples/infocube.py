@@ -28,8 +28,8 @@ WEATHER_APP_ID = os.getenv('WEATHER_APP_ID', '')
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MATRIX_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
-# Image paths
-IMAGES_DIR = os.path.join(SCRIPT_DIR, "images")
+# Use /tmp directory for images to avoid permission issues
+IMAGES_DIR = os.path.join("/tmp", "infocube_images")
 GIF_DIR = os.path.join(IMAGES_DIR, "gifs")
 WEATHER_ICONS_DIR = os.path.join(IMAGES_DIR, "weather-icons")
 
@@ -94,8 +94,11 @@ def ensure_directory_exists(directory):
     """Make sure the directory exists, create it if it doesn't"""
     if not os.path.exists(directory):
         try:
-            os.makedirs(directory, exist_ok=True)
+            # Create directory with explicit permissions
+            os.makedirs(directory, mode=0o777, exist_ok=True)
             logger.info(f"Created directory: {directory}")
+            # Ensure permissions after creation
+            os.chmod(directory, 0o777)
         except Exception as e:
             logger.error(f"Error creating directory {directory}: {e}")
             return False
@@ -159,17 +162,36 @@ def get_openweather_data():
         
         # Handle the icon
         icon_code = j['weather'][0]['icon']
+        
+        # First ensure the directory exists to avoid permission errors
+        if not os.path.exists(WEATHER_ICONS_DIR):
+            try:
+                os.makedirs(WEATHER_ICONS_DIR, mode=0o777, exist_ok=True)
+                os.chmod(WEATHER_ICONS_DIR, 0o777)
+                logger.info(f"Created weather icons directory: {WEATHER_ICONS_DIR}")
+            except Exception as e:
+                logger.error(f"Failed to create weather icons directory: {e}")
+                # Use a fallback path in /tmp
+                global WEATHER_ICONS_DIR
+                WEATHER_ICONS_DIR = "/tmp"
+                logger.info(f"Using fallback path: {WEATHER_ICONS_DIR}")
+        
         icon_path = download_weather_icon(icon_code)
         
         if icon_path and os.path.exists(icon_path):
             logger.info(f"Using weather icon: {icon_path}")
         else:
-            logger.warning("Weather icon not found, using default")
+            logger.warning("Weather icon not found, will use default")
             # Try to find any weather icon as a fallback
-            for filename in os.listdir(WEATHER_ICONS_DIR):
-                if filename.endswith('.png') or filename.endswith('.jpg'):
-                    icon_path = os.path.join(WEATHER_ICONS_DIR, filename)
-                    break
+            try:
+                if os.path.exists(WEATHER_ICONS_DIR):
+                    for filename in os.listdir(WEATHER_ICONS_DIR):
+                        if filename.endswith('.png') or filename.endswith('.jpg'):
+                            icon_path = os.path.join(WEATHER_ICONS_DIR, filename)
+                            break
+            except Exception as e:
+                logger.error(f"Error finding fallback icon: {e}")
+                icon_path = None
         
         return current, lowest, highest, icon_path
     except Exception as e:
@@ -453,12 +475,28 @@ class InfoCube(SampleBase):
             graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
             canvas = self.matrix.SwapOnVSync(canvas)
             
+            # Create a default weather icon if needed
+            default_icon = None
+            
             # Fetch weather data
             current, lowest, highest, icon_path = get_openweather_data()
             if icon_path and os.path.exists(icon_path):
                 weather_image = load_image(icon_path, (24, 24))
                 if weather_image:
                     self.image = weather_image
+            elif not hasattr(self, 'image') or self.image is None:
+                # If no weather icon is available, create a simple icon
+                logger.info("Creating a default weather icon")
+                try:
+                    from PIL import ImageDraw
+                    # Create a blank icon
+                    default_icon = Image.new('RGB', (24, 24), color=(0, 0, 0))
+                    draw = ImageDraw.Draw(default_icon)
+                    # Draw a simple sun
+                    draw.ellipse((4, 4, 20, 20), fill=(255, 255, 0))
+                    self.image = default_icon
+                except Exception as e:
+                    logger.error(f"Failed to create default icon: {e}")
             
             start_time = time.perf_counter()
             while True:

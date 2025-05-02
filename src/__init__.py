@@ -6,3 +6,5 @@ __all__ = [
     'MatrixManager',
     'TextRenderer'
 ]
+
+__version__ = '0.1.0'

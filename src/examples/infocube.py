@@ -29,7 +29,7 @@ MATRIX_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
 # Image paths
 IMAGES_DIR = os.path.join(SCRIPT_DIR, "images")
-logger.info("expected images to be here: ", IMAGES_DIR)
+logger.info(IMAGES_DIR)
 GIF_DIR = os.path.join(IMAGES_DIR, "gifs")
 WEATHER_ICONS_DIR = os.path.join(IMAGES_DIR, "weather-icons")
 

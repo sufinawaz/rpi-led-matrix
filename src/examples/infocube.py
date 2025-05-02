@@ -172,9 +172,11 @@ def get_openweather_data():
             except Exception as e:
                 logger.error(f"Failed to create weather icons directory: {e}")
                 # Use a fallback path in /tmp
-                global WEATHER_ICONS_DIR
-                WEATHER_ICONS_DIR = "/tmp"
-                logger.info(f"Using fallback path: {WEATHER_ICONS_DIR}")
+                fallback_dir = "/tmp/weather-icons"
+                os.makedirs(fallback_dir, mode=0o777, exist_ok=True)
+                logger.info(f"Using fallback path: {fallback_dir}")
+                icon_path = os.path.join(fallback_dir, f"{icon_code}.png")
+                return current, lowest, highest, icon_path
         
         icon_path = download_weather_icon(icon_code)
         

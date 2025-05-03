@@ -116,7 +116,8 @@ def download_weather_icon(icon_code):
     # If the icon already exists, return the path
     if os.path.exists(icon_path):
         return icon_path
-    
+    else:
+        logging.info(f"Icon Path: {icon_path}")
     # If the icon doesn't exist, download it from OpenWeatherMap
     try:
         # Construct the OpenWeatherMap icon URL

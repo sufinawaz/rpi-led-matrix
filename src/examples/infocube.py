@@ -224,16 +224,27 @@ def get_next_prayer_time(times):
             return times[i], PRAYER_NAMES[i]
     return times[0], PRAYER_NAMES[0]
 
-def load_image(image_path, size=None):
-    """Load an image with error handling and resizing"""
+def load_image(image_path, size=None, bg_color=(0, 0, 0, 255)):
+    """Load an image with error handling, resizing and proper transparency handling"""
     if not os.path.exists(image_path):
         logger.error(f"Image file not found: {image_path}")
         return None
 
     try:
-        image = Image.open(image_path).convert('RGB')
+        # First load as RGBA to preserve transparency information
+        image = Image.open(image_path).convert('RGBA')
+        
+        # Create a background of the specified color
+        background = Image.new('RGBA', image.size, bg_color)
+        
+        # Composite the image onto the background
+        image = Image.alpha_composite(background, image)
+        
+        # Convert to RGB for display
+        image = image.convert('RGB')
+        
         if size:
-            # Use LANCZOS resampling for high-quality downsampling (replaces deprecated ANTIALIAS)
+            # Use LANCZOS resampling for high-quality downsampling
             image_resize_method = Image.LANCZOS if hasattr(Image, 'LANCZOS') else Image.ANTIALIAS
             image.thumbnail(size, image_resize_method)
         return image

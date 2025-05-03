@@ -25,6 +25,7 @@ def run_command(command, cwd=None, shell=False):
     logger.info(f"Running: {command}")
     if not shell and isinstance(command, str):
         command = command.split()
+    
     try:
         process = subprocess.Popen(
             command,
@@ -34,7 +35,7 @@ def run_command(command, cwd=None, shell=False):
             cwd=cwd,
             shell=shell
         )
-
+        
         # Print output in real-time
         for line in iter(process.stdout.readline, ''):
             line = line.rstrip()
@@ -129,7 +130,7 @@ def install_system_packages():
             "python3-pillow",
             "python3-pip",
             "python3-requests",  # Add system package for requests
-            "python3-configparser",  # Add system package for configparser
+            # configparser is built into Python 3, no need for separate package
             "libgraphicsmagick++-dev",
             "libwebp-dev",
             "git"
@@ -234,8 +235,8 @@ def install_python_dependencies():
         # Install using apt instead
         packages = [
             "python3-requests",
-            "python3-pillow",
-            "python3-configparser"
+            "python3-pillow"
+            # configparser is built into Python 3, no need for separate package
         ]
         
         apt_command = ["apt-get", "install", "-y"] + packages
@@ -244,7 +245,7 @@ def install_python_dependencies():
             return False
     else:
         # We can use pip directly
-        packages = ["requests", "pillow", "configparser"]
+        packages = ["requests", "pillow"]  # configparser is built into Python 3
         pip_command = [sys.executable, "-m", "pip", "install"] + packages
         
         if run_command(pip_command) != 0:
@@ -332,7 +333,6 @@ def setup():
         logger.warning("You may need to install the following packages manually:")
         logger.warning("  - requests (for API calls)")
         logger.warning("  - pillow (for image processing)")
-        logger.warning("  - configparser (for configuration file handling)")
     
     # Create config file
     if not create_config_file(project_root):

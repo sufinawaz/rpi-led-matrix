@@ -1,3 +1,5 @@
+src/__pycache__/*
+
 # Python bytecode files
 __pycache__/
 *.py[cod]
@@ -94,3 +96,8 @@ temp/
 # Running logs
 logs/
 *.log
+
+
+resources/fonts/*
+rpi-rgb-led-matrix/
+run_infocube

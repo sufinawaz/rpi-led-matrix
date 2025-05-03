@@ -67,7 +67,7 @@ def create_project_structure():
     
     # Define project directories
     directories = [
-        os.path.join(project_root, "src"),
+        os.path.join(project_root, "src"),  # Just one src directory
         os.path.join(project_root, "resources"),
         os.path.join(project_root, "resources/images"),
         os.path.join(project_root, "resources/images/gifs"),
@@ -255,12 +255,37 @@ def create_launcher_script(project_root):
     
     return True
 
+def move_infocube_to_src(project_root):
+    """Move infocube.py from examples to src directory if it exists"""
+    print_header("Moving infocube.py")
+    
+    examples_dir = os.path.join(project_root, "src", "examples")
+    infocube_source = os.path.join(examples_dir, "infocube.py")
+    infocube_dest = os.path.join(project_root, "src", "infocube.py")
+    
+    if os.path.isfile(infocube_source):
+        try:
+            shutil.copy2(infocube_source, infocube_dest)
+            logger.info(f"Copied infocube.py from examples to src directory")
+            # Make the file executable
+            os.chmod(infocube_dest, 0o755)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to copy infocube.py: {e}")
+            return False
+    else:
+        logger.info("infocube.py not found in examples directory. This is normal for a fresh installation.")
+        return True
+
 def setup():
     """Main setup function"""
     print_header("LED Matrix InfoCube Setup")
     
     # Create project structure
     project_root = create_project_structure()
+    
+    # Move infocube.py if it exists in examples
+    move_infocube_to_src(project_root)
     
     # Install system packages
     if not install_system_packages():

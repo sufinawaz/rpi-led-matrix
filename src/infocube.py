@@ -7,6 +7,7 @@ import sys
 import os
 import argparse
 import requests
+from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
 
 # Configure logging - simplified
 logging.basicConfig(
@@ -15,14 +16,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
-
-# Import RGB Matrix components
-try:
-    from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
-except ImportError:
-    logger.error("Failed to import rgbmatrix. Make sure it's properly installed.")
-    logger.error("Install with: sudo pip3 install rgbmatrix")
-    sys.exit(1)
 
 #############################################
 #          Configuration Settings           #
@@ -61,9 +54,8 @@ DEFAULT_DRAW.ellipse((4, 4, 20, 20), fill=(255, 255, 0))  # Simple sun icon
 # Update intervals (in seconds)
 WEATHER_UPDATE_INTERVAL = 3600  # 1 hour
 
-def setup_directories():
+def check_directories():
     """Check that required directories exist"""
-    # Just log the directories we're using
     dirs = [RESOURCES_DIR, IMAGES_DIR, GIF_DIR, WEATHER_ICONS_DIR, FONT_DIR]
     for directory in dirs:
         if os.path.exists(directory):
@@ -71,9 +63,6 @@ def setup_directories():
         else:
             logger.warning(f"Directory does not exist: {directory}")
 
-#############################################
-#              Utility Functions            #
-#############################################
 def get_date_time(h24format=False):
     """Get formatted date and time"""
     tm = datetime.now()
@@ -152,11 +141,10 @@ def get_next_prayer_time(times):
     if not times:
         return None, None
         
-    day, dt, mo, clk = get_date_time(True)
-    logger.info(f"Getting next prayer time. Current time: {clk}")
+    _, _, _, current_time = get_date_time(True)
     
     for i in range(5):
-        if times[i] > clk:
+        if times[i] > current_time:
             logger.info(f"Next prayer is {PRAYER_NAMES[i]} at {times[i]}")
             return times[i], PRAYER_NAMES[i]
     
@@ -201,7 +189,7 @@ class InfoCube:
         options.brightness = 40
         options.hardware_mapping = 'adafruit-hat'
         options.gpio_slowdown = 2
-        options.rgb_sequence = 'RBG'
+        options.led_rgb_sequence = 'RBG'
         options.drop_privileges = False  # --led-no-drop-privs always enabled
         
         self.matrix = RGBMatrix(options=options)
@@ -283,7 +271,7 @@ class InfoCube:
         
         while True:
             now = time.perf_counter()
-            current_time = get_date_time(True)[3]  # Get current time in HH:MM format
+            _, _, _, current_time = get_date_time(True)  # Get current time in HH:MM format
             
             # Check if we need to refresh prayer times based on next prayer time
             if next_prayer_time and current_time >= next_prayer_time:
@@ -340,7 +328,7 @@ class InfoCube:
         
         while True:
             now = time.perf_counter()
-            current_time = get_date_time(True)[3]  # Get current time in HH:MM format
+            _, _, _, current_time = get_date_time(True)  # Get current time in HH:MM format
             
             # Update weather data every 1 hour
             if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
@@ -362,7 +350,7 @@ class InfoCube:
             canvas.Clear()
             
             # Get current time
-            day, dt, mo, clk = get_date_time()
+            day, date, month, clock = get_date_time()
             
             # Display weather icon if available
             if self.image:
@@ -370,11 +358,11 @@ class InfoCube:
             
             # Display calendar
             graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
-            graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], dt)
-            graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], mo)
+            graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], date)
+            graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], month)
             
             # Display clock
-            graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
+            graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clock)
             
             # Display weather information if available
             if current and highest and lowest:
@@ -419,7 +407,7 @@ class InfoCube:
         
         while True:
             # Get current time for clock display
-            day, dt, mo, clk = get_date_time()
+            _, _, _, clock = get_date_time()
             
             # Display each frame of the GIF
             for frame in range(frame_count):
@@ -430,11 +418,11 @@ class InfoCube:
                 canvas.SetImage(frame_image, 0, 0, False)
                 
                 # Display time centered on the GIF
-                text_width = len(clk) * 8  # Approximate width per character
+                text_width = len(clock) * 8  # Approximate width per character
                 x_pos = (canvas.width - text_width) // 2
                 y_pos = canvas.height // 2  # Center vertically
                 
-                graphics.DrawText(canvas, self.font, x_pos, y_pos, self.color['white'], clk)
+                graphics.DrawText(canvas, self.font, x_pos, y_pos, self.color['white'], clock)
                 
                 canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(0.1)
@@ -469,7 +457,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Check directories
-    setup_directories()
+    check_directories()
     
     # Verify we're running as root (required for GPIO access)
     if os.geteuid() != 0:

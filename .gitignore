@@ -1,1 +1,96 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Distribution / packaging
+wheels/
+*.egg-info/
+.installed.cfg
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.spyderproject
+.spyproject
+.ropeproject
+.editorconfig
+
+# Environment variables and personal settings
+.env
+*.ini
+config.ini
+.python-version
+venv/
+ENV/
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Raspberry Pi specific
+*.log
+*.pid
+*.lock
+
+# Project specific
+resources/images/*
+!resources/images/.gitkeep
+!resources/images/gifs/.gitkeep
+!resources/images/weather-icons/.gitkeep
+
+# Keep default images
+!resources/images/wm.jpg
+!resources/images/mosque.jpg
+
+# API keys and sensitive information
+API_KEYS.py
+
+# Temp files
+tmp/
+temp/
+
+# Compiled C extension libraries
+*.so
+
+# Running logs
+logs/
+*.log

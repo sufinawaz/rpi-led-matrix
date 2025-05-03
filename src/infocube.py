@@ -93,6 +93,9 @@ WEATHER_ICONS = {
 # Fallback icon if OpenWeatherMap icon code is not recognized
 DEFAULT_WEATHER_ICON = 'cloudy.png'
 
+# Update intervals (in seconds)
+WEATHER_UPDATE_INTERVAL = 10800  # 3 hours
+
 def setup_directories():
     """Create all required directories and initialize GIFS dictionary"""
     global GIFS
@@ -251,7 +254,7 @@ def get_openweather_data():
         
         # Handle the icon
         icon_code = j['weather'][0]['icon']
-        logger.error(f"Icon Path: {WEATHER_ICONS_DIR} {icon_code}")
+        logger.info(f"Icon Path: {WEATHER_ICONS_DIR} {icon_code}")
         
         # First ensure the directory exists to avoid permission errors
         if not os.path.exists(WEATHER_ICONS_DIR):
@@ -296,20 +299,51 @@ def get_prayer_times():
     try:
         r = requests.get('http://api.aladhan.com/v1/timings?latitude=38.903481&longitude=-77.262817&method=1&school=1',
                          headers={'Accept': 'application/json'})
+        
+        # Check if the request was successful
+        if r.status_code != 200:
+            logger.error(f"Prayer times API returned status code {r.status_code}")
+            return None
+            
         j = r.json()
         timings = j['data']['timings']
         fajr, dhuhr, asr, maghrib, isha = timings['Fajr'], timings['Dhuhr'], timings['Asr'], timings['Maghrib'], timings['Isha']
         return fajr, dhuhr, asr, maghrib, isha
     except Exception as e:
         logger.error(f"Error fetching prayer times: {e}")
-        return "05:00", "12:00", "15:00", "18:00", "20:00"  # Default values if API fails
+        return None
+
+def prayer_time_passed(time_str):
+    """Check if a prayer time has passed or is current"""
+    try:
+        # Get current time in 24-hour format
+        _, _, _, current_time = get_date_time(True)
+        
+        # Convert strings to comparable format (remove any leading/trailing spaces)
+        current_time = current_time.strip()
+        time_str = time_str.strip()
+        
+        # Compare the times
+        return time_str <= current_time
+    except Exception as e:
+        logger.error(f"Error comparing prayer times: {e}")
+        return False
 
 def get_next_prayer_time(times):
-    """Get the next prayer time based on current time"""
-    day, dt, mo, clk = get_date_time(True, 10)
+    """
+    Get the next prayer time based on current time
+    Returns (time, name) tuple or (None, None) if times is None
+    """
+    if not times:
+        return None, None
+        
+    day, dt, mo, clk = get_date_time(True)
+    
     for i in range(5):
         if times[i] > clk:
             return times[i], PRAYER_NAMES[i]
+    
+    # If all prayer times have passed for today, return the first prayer for tomorrow
     return times[0], PRAYER_NAMES[0]
 
 def load_image(image_path, size=None, bg_color=(0, 0, 0, 255)):
@@ -445,7 +479,8 @@ class InfoCube(SampleBase):
             'lightBlue': graphics.Color(173, 216, 230),
             'darkBlue': graphics.Color(30, 144, 255),
             'grey': graphics.Color(150, 150, 150),
-            'pink': graphics.Color(255, 114, 118)
+            'pink': graphics.Color(255, 114, 118),
+            'error': graphics.Color(255, 0, 0)  # Error color
         }
         
         self.fontSmall = graphics.Font()
@@ -533,7 +568,16 @@ class InfoCube(SampleBase):
         try:
             # Get initial prayer times
             times = get_prayer_times()
-            next_prayer_time, _ = get_next_prayer_time(times)
+            
+            # Handle case when API fails
+            if not times:
+                canvas.Clear()
+                graphics.DrawText(canvas, self.font, 3, 18, self.color['error'], "API ERR")
+                canvas = self.matrix.SwapOnVSync(canvas)
+                time.sleep(30)  # Wait 30 seconds before trying again
+                return
+                
+            next_prayer_time, next_prayer_name = get_next_prayer_time(times)
             canvas.Clear()
             
             # Load mosque logo if available
@@ -542,25 +586,51 @@ class InfoCube(SampleBase):
                 canvas.SetImage(mosque_image, 44, 2, False)
                 self.image = mosque_image  # Store for reuse
             
-            start_time = time.perf_counter()
+            last_update_time = time.perf_counter()
+            check_prayer_time = True
+            
             while True:
                 now = time.perf_counter()
-                if (now - start_time) > 60:  # Update every minute
+                current_time = get_date_time(True)[3]  # Get current time in HH:MM format
+                
+                # Check if we need to refresh prayer times based on next prayer time
+                if check_prayer_time and next_prayer_time and current_time >= next_prayer_time:
+                    logger.info(f"Next prayer time reached: {next_prayer_time}, refreshing data")
                     times = get_prayer_times()
-                    next_prayer_time, _ = get_next_prayer_time(times)
-                    start_time = now
+                    
+                    if times:
+                        next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+                        last_update_time = now
+                    else:
+                        # API failed, set a retry timer instead of showing default values
+                        next_prayer_time = None
+                        next_prayer_name = None
+                        check_prayer_time = False  # Temporarily disable prayer time checking
+                        
+                # If API failed and retry timer is up, try again
+                if not check_prayer_time and now - last_update_time > 60:  # Retry every minute
+                    times = get_prayer_times()
+                    if times:
+                        next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+                        check_prayer_time = True  # Re-enable prayer time checking
+                    last_update_time = now
                 
                 canvas.Clear()
                 # Display mosque image if available
                 if self.image:
                     canvas.SetImage(self.image, 44, 2, False)
                 
-                # Display prayer times
-                for i in range(5):
-                    # Highlight the next prayer
-                    timecolor = self.color['orange'] if times[i] == next_prayer_time else self.color['white']
-                    graphics.DrawText(canvas, self.fontSmall, 5, (i+1)*6, self.color['skyBlue'], str(PRAYER_NAMES[i]))
-                    graphics.DrawText(canvas, self.fontSmall, 23, (i+1)*6, timecolor, str(times[i]))
+                if times:
+                    # Display prayer times
+                    for i in range(5):
+                        # Highlight the next prayer
+                        timecolor = self.color['orange'] if times[i] == next_prayer_time else self.color['white']
+                        graphics.DrawText(canvas, self.fontSmall, 5, (i+1)*6, self.color['skyBlue'], str(PRAYER_NAMES[i]))
+                        graphics.DrawText(canvas, self.fontSmall, 23, (i+1)*6, timecolor, str(times[i]))
+                else:
+                    # Display error message if API failed
+                    graphics.DrawText(canvas, self.fontSmall, 5, 15, self.color['error'], "Prayer API Error")
+                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['white'], "Retrying...")
                 
                 canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(0.1)  # Small sleep to prevent high CPU usage
@@ -607,20 +677,43 @@ class InfoCube(SampleBase):
                 except Exception as e:
                     logger.error(f"Failed to create default icon: {e}")
             
-            start_time = time.perf_counter()
+            last_weather_update = time.perf_counter()
+            check_prayer_time = True
+            
             while True:
                 now = time.perf_counter()
-                if (now - start_time) > 600:  # Update every 10 minutes
-                    # Refresh all data
-                    times = get_prayer_times()
-                    next_prayer_time, prayer = get_next_prayer_time(times)
+                current_time = get_date_time(True)[3]  # Get current time in HH:MM format
+                
+                # Check if we need to update weather data (every 3 hours)
+                if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
+                    logger.info("Weather update interval reached, refreshing data")
                     c, l, h, i = get_openweather_data()
                     if c and l and h and i and os.path.exists(i):
                         current, lowest, highest, icon_path = c, l, h, i
                         weather_image = load_image(icon_path, (24, 24))
                         if weather_image:
                             self.image = weather_image
-                    start_time = now
+                    last_weather_update = now
+                
+                # Check if we need to refresh prayer times based on next prayer time
+                if check_prayer_time and next_prayer_time and current_time >= next_prayer_time:
+                    logger.info(f"Next prayer time reached: {next_prayer_time}, refreshing data")
+                    times = get_prayer_times()
+                    
+                    if times:
+                        next_prayer_time, prayer = get_next_prayer_time(times)
+                    else:
+                        # API failed, set a retry timer instead of showing default values
+                        next_prayer_time = None
+                        prayer = None
+                        check_prayer_time = False  # Temporarily disable prayer time checking
+                
+                # If API failed and retry timer is up, try again
+                if not check_prayer_time and now - last_weather_update > 60:  # Retry every minute
+                    times = get_prayer_times()
+                    if times:
+                        next_prayer_time, prayer = get_next_prayer_time(times)
+                        check_prayer_time = True  # Re-enable prayer time checking
                 
                 # Clear canvas for new frame
                 canvas.Clear()
@@ -645,10 +738,17 @@ class InfoCube(SampleBase):
                     graphics.DrawText(canvas, self.font, 42, 30, self.color['skyBlue'], current)
                     graphics.DrawText(canvas, self.fontSmall, 28, 25, self.color['pink'], highest)
                     graphics.DrawText(canvas, self.fontSmall, 28, 31, self.color['lightBlue'], lowest)
+                else:
+                    # Display error message if weather API failed
+                    graphics.DrawText(canvas, self.fontSmall, 42, 30, self.color['error'], "W-ERR")
                 
-                # Display prayer information
-                graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['grey'], str(prayer))
-                graphics.DrawText(canvas, self.fontSmall, 5, 31, self.color['darkBlue'], str(next_prayer_time))
+                # Display prayer information if available
+                if prayer and next_prayer_time:
+                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['grey'], str(prayer))
+                    graphics.DrawText(canvas, self.fontSmall, 5, 31, self.color['darkBlue'], str(next_prayer_time))
+                else:
+                    # Display error message if prayer API failed
+                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['error'], "P-ERR")
                 
                 # Update display
                 canvas = self.matrix.SwapOnVSync(canvas)

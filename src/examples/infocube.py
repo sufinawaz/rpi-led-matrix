@@ -595,8 +595,14 @@ class InfoCube(SampleBase):
                             frame_image = self.image.convert('RGB')
                             canvas.SetImage(frame_image, 0, 0, False)
                             
-                            # Display time on top of GIF
-                            graphics.DrawText(canvas, self.font, 3, 18, clr, clk)
+                            # Calculate text width to center it
+                            # This is an estimation since we don't have direct text width measurement
+                            text_width = len(clk) * 8  # Approximate width per character
+                            x_pos = (canvas.width - text_width) // 2
+                            y_pos = canvas.height // 2  # Center vertically
+                            
+                            # Display time centered on the GIF
+                            graphics.DrawText(canvas, self.font, x_pos, y_pos, clr, clk)
                             
                             canvas = self.matrix.SwapOnVSync(canvas)
                             

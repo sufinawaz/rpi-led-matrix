@@ -25,7 +25,6 @@ def run_command(command, cwd=None, shell=False):
     logger.info(f"Running: {command}")
     if not shell and isinstance(command, str):
         command = command.split()
-    
     try:
         process = subprocess.Popen(
             command,
@@ -35,7 +34,7 @@ def run_command(command, cwd=None, shell=False):
             cwd=cwd,
             shell=shell
         )
-        
+
         # Print output in real-time
         for line in iter(process.stdout.readline, ''):
             line = line.rstrip()
@@ -58,21 +57,41 @@ def create_directory(directory):
         logger.error(f"Failed to create directory {directory}: {e}")
         return False
 
+def determine_project_root():
+    """
+    Determine the correct project root directory based on the current location
+    of the setup.py file and directory structure
+    """
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Check if we're running from within the src directory
+    if os.path.basename(script_dir) == "src" and os.path.exists(os.path.join(script_dir, "matrix_manager.py")):
+        # We're in the src directory, project root is one level up
+        project_root = os.path.dirname(script_dir)
+        logger.info(f"Running from src directory, project root is: {project_root}")
+    else:
+        # We're already at the project root or in some other location
+        project_root = script_dir
+        logger.info(f"Project root is: {project_root}")
+    
+    return project_root
+
 def create_project_structure():
     """Create the project directory structure"""
     print_header("Setting up project structure")
     
-    # Project root is where this script is located
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    # Determine project root based on current location
+    project_root = determine_project_root()
     
     # Define project directories
     directories = [
-        os.path.join(project_root, "src"),  # Just one src directory
+        os.path.join(project_root, "src"),
         os.path.join(project_root, "resources"),
-        os.path.join(project_root, "resources/images"),
-        os.path.join(project_root, "resources/images/gifs"),
-        os.path.join(project_root, "resources/images/weather-icons"),
-        os.path.join(project_root, "resources/fonts")
+        os.path.join(project_root, "resources", "images"),
+        os.path.join(project_root, "resources", "images", "gifs"),
+        os.path.join(project_root, "resources", "images", "weather-icons"),
+        os.path.join(project_root, "resources", "fonts")
     ]
     
     # Create directories
@@ -89,17 +108,28 @@ def install_system_packages():
     is_raspberry_pi = False
     try:
         with open('/proc/cpuinfo', 'r') as f:
-            if 'Raspberry Pi' in f.read():
+            if 'Raspberry Pi' in f.read() or 'BCM' in f.read():
                 is_raspberry_pi = True
     except:
-        pass
+        # If we can't read the file, check if we're on Linux and the hostname
+        # contains "raspberry" or "pi"
+        if sys.platform.startswith('linux'):
+            try:
+                hostname = subprocess.check_output("hostname", shell=True).decode().strip().lower()
+                if "raspberry" in hostname or "pi" in hostname:
+                    is_raspberry_pi = True
+            except:
+                pass
     
     if is_raspberry_pi:
         # Install required packages for Raspberry Pi
+        logger.info("Detected Raspberry Pi environment")
         packages = [
             "python3-dev",
             "python3-pillow",
             "python3-pip",
+            "python3-requests",  # Add system package for requests
+            "python3-configparser",  # Add system package for configparser
             "libgraphicsmagick++-dev",
             "libwebp-dev",
             "git"
@@ -185,15 +215,41 @@ def install_rgb_matrix_library(project_root):
     return True
 
 def install_python_dependencies():
-    """Install required Python packages"""
+    """Install required Python packages, handling externally managed environments"""
     print_header("Installing Python dependencies")
     
-    packages = ["requests", "pillow", "configparser"]
-    pip_command = [sys.executable, "-m", "pip", "install"] + packages
+    # Test if we're in an externally managed environment (like Debian)
+    test_command = [sys.executable, "-m", "pip", "install", "--dry-run", "requests"]
+    result = subprocess.run(
+        test_command, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE, 
+        text=True
+    )
     
-    if run_command(pip_command) != 0:
-        logger.error("Failed to install Python dependencies")
-        return False
+    if "externally-managed-environment" in result.stderr:
+        logger.info("Detected externally managed Python environment")
+        logger.info("Using apt to install Python dependencies instead of pip")
+        
+        # Install using apt instead
+        packages = [
+            "python3-requests",
+            "python3-pillow",
+            "python3-configparser"
+        ]
+        
+        apt_command = ["apt-get", "install", "-y"] + packages
+        if run_command(["sudo"] + apt_command) != 0:
+            logger.error("Failed to install Python dependencies via apt")
+            return False
+    else:
+        # We can use pip directly
+        packages = ["requests", "pillow", "configparser"]
+        pip_command = [sys.executable, "-m", "pip", "install"] + packages
+        
+        if run_command(pip_command) != 0:
+            logger.error("Failed to install Python dependencies")
+            return False
     
     return True
 
@@ -255,37 +311,12 @@ def create_launcher_script(project_root):
     
     return True
 
-def move_infocube_to_src(project_root):
-    """Move infocube.py from examples to src directory if it exists"""
-    print_header("Moving infocube.py")
-    
-    examples_dir = os.path.join(project_root, "src", "examples")
-    infocube_source = os.path.join(examples_dir, "infocube.py")
-    infocube_dest = os.path.join(project_root, "src", "infocube.py")
-    
-    if os.path.isfile(infocube_source):
-        try:
-            shutil.copy2(infocube_source, infocube_dest)
-            logger.info(f"Copied infocube.py from examples to src directory")
-            # Make the file executable
-            os.chmod(infocube_dest, 0o755)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to copy infocube.py: {e}")
-            return False
-    else:
-        logger.info("infocube.py not found in examples directory. This is normal for a fresh installation.")
-        return True
-
 def setup():
     """Main setup function"""
     print_header("LED Matrix InfoCube Setup")
     
-    # Create project structure
+    # Create project structure and get correct project root
     project_root = create_project_structure()
-    
-    # Move infocube.py if it exists in examples
-    move_infocube_to_src(project_root)
     
     # Install system packages
     if not install_system_packages():
@@ -297,7 +328,11 @@ def setup():
     
     # Install Python dependencies
     if not install_python_dependencies():
-        return False
+        logger.warning("Failed to install some Python dependencies")
+        logger.warning("You may need to install the following packages manually:")
+        logger.warning("  - requests (for API calls)")
+        logger.warning("  - pillow (for image processing)")
+        logger.warning("  - configparser (for configuration file handling)")
     
     # Create config file
     if not create_config_file(project_root):

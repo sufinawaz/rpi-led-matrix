@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
 import time
 from datetime import datetime, timedelta
 import threading
@@ -11,6 +10,7 @@ import argparse
 import requests
 import shutil
 from PIL import ImageDraw
+import pkg_resources
 
 # Setup basic logging
 logging.basicConfig(
@@ -20,38 +20,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Import RGB Matrix components
+try:
+    from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
+except ImportError:
+    logger.error("Failed to import rgbmatrix. Make sure it's properly installed.")
+    logger.error("Follow installation instructions at: https://github.com/hzeller/rpi-rgb-led-matrix")
+    sys.exit(1)
+
 #############################################
 #          Configuration Settings           #
 #############################################
+# Get the WEATHER_APP_ID from environment variable
 WEATHER_APP_ID = os.getenv('WEATHER_APP_ID', '')
 
-# Default paths - update these to match your setup
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MATRIX_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+# Determine the base directory for the project - this should work regardless of where the script is called from
+SCRIPT_PATH = os.path.abspath(__file__)
+SRC_DIR = os.path.dirname(SCRIPT_PATH)
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
 
-# Use script_dir/images directory for images
-IMAGES_DIR = os.path.join(SCRIPT_DIR, "images")
+# Set up resource directories - create them if they don't exist
+RESOURCES_DIR = os.path.join(PROJECT_ROOT, "resources")
+IMAGES_DIR = os.path.join(RESOURCES_DIR, "images")
 GIF_DIR = os.path.join(IMAGES_DIR, "gifs")
 WEATHER_ICONS_DIR = os.path.join(IMAGES_DIR, "weather-icons")
 
-# Font paths
-FONT_DIR = os.path.join(MATRIX_DIR, "fonts")
+# Font paths - now inside resources directory
+FONT_DIR = os.path.join(RESOURCES_DIR, "fonts")
 FONT_SMALL_PATH = os.path.join(FONT_DIR, "4x6.bdf")
 FONT_MEDIUM_PATH = os.path.join(FONT_DIR, "7x13.bdf")
+
+# Check for alternative font locations if needed
+ALT_FONT_DIRS = [
+    "/usr/local/share/fonts",
+    "/usr/share/fonts",
+    os.path.join(PROJECT_ROOT, "rpi-rgb-led-matrix", "fonts"),
+    os.path.expanduser("~/.local/share/fonts")
+]
 
 # Image paths
 WOOD_MISTRY_LOGO = os.path.join(IMAGES_DIR, "wm.jpg")
 MOSQUE_LOGO = os.path.join(IMAGES_DIR, "mosque.jpg")
 
-# GIF paths
-GIFS = {
-    'fireplace': os.path.join(GIF_DIR, "fireplace.gif"),
-    'matrix': os.path.join(GIF_DIR, "matrix.gif"),
-    'nebula': os.path.join(GIF_DIR, "nebula.gif"),
-    'hyperloop': os.path.join(GIF_DIR, "hyperloop.gif"),
-    'spacetravel': os.path.join(GIF_DIR, "spacetravel.gif"),
-    'retro': os.path.join(GIF_DIR, "retro.gif")
-}
+# GIF paths - populated dynamically
+GIFS = {}
 
 # Prayer names
 PRAYER_NAMES = ('Fajr', 'Zuhr', 'Asr', 'Magh', 'Isha')
@@ -80,6 +92,81 @@ WEATHER_ICONS = {
 
 # Fallback icon if OpenWeatherMap icon code is not recognized
 DEFAULT_WEATHER_ICON = 'cloudy.png'
+
+def setup_directories():
+    """Create all required directories and initialize GIFS dictionary"""
+    global GIFS
+    
+    dirs_to_create = [RESOURCES_DIR, IMAGES_DIR, GIF_DIR, WEATHER_ICONS_DIR, FONT_DIR]
+    
+    for directory in dirs_to_create:
+        ensure_directory_exists(directory)
+    
+    # Set up GIFs dictionary dynamically
+    if os.path.exists(GIF_DIR):
+        for gif_file in os.listdir(GIF_DIR):
+            if gif_file.endswith('.gif'):
+                gif_name = os.path.splitext(gif_file)[0]
+                GIFS[gif_name] = os.path.join(GIF_DIR, gif_file)
+    
+    # If GIFS is empty, add some default entries (they won't work until the files exist)
+    if not GIFS:
+        default_gifs = ['fireplace', 'matrix', 'nebula', 'hyperloop', 'spacetravel', 'retro']
+        for gif_name in default_gifs:
+            GIFS[gif_name] = os.path.join(GIF_DIR, f"{gif_name}.gif")
+    
+    logger.info(f"Found {len(GIFS)} GIFs: {', '.join(GIFS.keys())}")
+    
+    # Check for fonts and note their paths
+    find_fonts()
+
+def find_fonts():
+    """Check for available fonts and set paths"""
+    global FONT_SMALL_PATH, FONT_MEDIUM_PATH
+    
+    # Check if default font paths exist
+    if not os.path.exists(FONT_SMALL_PATH):
+        logger.warning(f"Small font not found at {FONT_SMALL_PATH}")
+        
+        # Look for fonts in alternative locations
+        for font_dir in ALT_FONT_DIRS:
+            if os.path.exists(font_dir):
+                logger.info(f"Checking {font_dir} for fonts...")
+                
+                # Look for 4x6.bdf
+                small_font_path = os.path.join(font_dir, "4x6.bdf")
+                if os.path.exists(small_font_path):
+                    FONT_SMALL_PATH = small_font_path
+                    logger.info(f"Found small font at {FONT_SMALL_PATH}")
+                    break
+                
+                # Look for any .bdf font
+                for file in os.listdir(font_dir):
+                    if file.endswith('.bdf'):
+                        FONT_SMALL_PATH = os.path.join(font_dir, file)
+                        logger.info(f"Using alternative small font: {FONT_SMALL_PATH}")
+                        break
+                
+                if os.path.exists(FONT_SMALL_PATH):
+                    break
+    
+    if not os.path.exists(FONT_MEDIUM_PATH):
+        logger.warning(f"Medium font not found at {FONT_MEDIUM_PATH}")
+        
+        # Look for 7x13.bdf
+        for font_dir in ALT_FONT_DIRS:
+            if os.path.exists(font_dir):
+                medium_font_path = os.path.join(font_dir, "7x13.bdf")
+                if os.path.exists(medium_font_path):
+                    FONT_MEDIUM_PATH = medium_font_path
+                    logger.info(f"Found medium font at {FONT_MEDIUM_PATH}")
+                    break
+                
+                # If we already found a small font, use that as a fallback
+                if os.path.exists(FONT_SMALL_PATH):
+                    FONT_MEDIUM_PATH = FONT_SMALL_PATH
+                    logger.info(f"Using small font as fallback for medium font")
+                    break
 
 #############################################
 #              Utility Functions            #
@@ -364,10 +451,8 @@ class InfoCube(SampleBase):
         self.fontSmall = graphics.Font()
         self.font = graphics.Font()
         
-        # Create required directories
-        ensure_directory_exists(IMAGES_DIR)
-        ensure_directory_exists(GIF_DIR)
-        ensure_directory_exists(WEATHER_ICONS_DIR)
+        # Ensure all directories exist
+        setup_directories()
         
         # Load fonts
         try:
@@ -376,21 +461,29 @@ class InfoCube(SampleBase):
             else:
                 logger.error(f"Small font not found at {FONT_SMALL_PATH}")
                 # Try to find any fonts
-                for font_dir in [FONT_DIR, "/usr/share/fonts", "/usr/local/share/fonts"]:
+                for font_dir in [FONT_DIR] + ALT_FONT_DIRS:
                     if os.path.exists(font_dir):
                         for file in os.listdir(font_dir):
                             if file.endswith('.bdf'):
-                                self.fontSmall.LoadFont(os.path.join(font_dir, file))
-                                logger.info(f"Using fallback small font: {file}")
-                                break
+                                try:
+                                    font_path = os.path.join(font_dir, file)
+                                    self.fontSmall.LoadFont(font_path)
+                                    logger.info(f"Using fallback small font: {font_path}")
+                                    break
+                                except Exception as e:
+                                    logger.error(f"Failed to load font {file}: {e}")
+                                    continue
+                        if hasattr(self.fontSmall, 'height') and self.fontSmall.height > 0:
+                            break
             
             if os.path.exists(FONT_MEDIUM_PATH):
                 self.font.LoadFont(FONT_MEDIUM_PATH)
             else:
                 logger.error(f"Medium font not found at {FONT_MEDIUM_PATH}")
                 # Use the same font as small if available
-                if hasattr(self, 'fontSmall') and self.fontSmall:
+                if hasattr(self, 'fontSmall') and self.fontSmall and hasattr(self.fontSmall, 'height') and self.fontSmall.height > 0:
                     self.font = self.fontSmall
+                    logger.info("Using small font as medium font")
         except Exception as e:
             logger.error(f"Failed to load fonts: {e}")
             logger.info(f"Looking for fonts in {FONT_DIR}")
@@ -651,10 +744,8 @@ class InfoCube(SampleBase):
 #############################################
 if __name__ == "__main__":
     try:
-        # Create required directories
-        ensure_directory_exists(IMAGES_DIR)
-        ensure_directory_exists(GIF_DIR)
-        ensure_directory_exists(WEATHER_ICONS_DIR)
+        # Make sure required directories exist before starting
+        setup_directories()
         
         # Start InfoCube
         info_cube = InfoCube()

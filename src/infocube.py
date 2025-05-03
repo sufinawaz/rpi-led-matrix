@@ -1,240 +1,21 @@
-def display_clock_weather(self, canvas):
-        try:
-            logger.info("Initializing clock and weather display")
-            # Get initial data
-            day, dt, mo, clk = get_date_time()
-            times = get_prayer_times()
-            next_prayer_time, prayer = get_next_prayer_time(times)
-            
-            # Display calendar and date while weather data loads
-            graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
-            graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], dt)
-            graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], mo)
-            # Display time
-            graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
-            canvas = self.matrix.SwapOnVSync(canvas)
-            
-            # Create a default weather icon if needed
-            default_icon = None
-            
-            # Fetch weather data
-            logger.info("Fetching initial weather data")
-            current, lowest, highest, icon_path = get_openweather_data()
-            if icon_path and os.path.exists(icon_path):
-                weather_image = load_image(icon_path, (24, 24))
-                if weather_image:
-                    self.image = weather_image
-                    logger.info(f"Loaded weather icon: {icon_path}")
-            elif not hasattr(self, 'image') or self.image is None:
-                # If no weather icon is available, create a simple icon
-                logger.info("Creating a default weather icon")
-                try:
-                    # Create a blank icon
-                    default_icon = Image.new('RGB', (24, 24), color=(0, 0, 0))
-                    draw = ImageDraw.Draw(default_icon)
-                    # Draw a simple sun
-                    draw.ellipse((4, 4, 20, 20), fill=(255, 255, 0))
-                    self.image = default_icon
-                    logger.info("Created default sun icon")
-                except Exception as e:
-                    logger.error(f"Failed to create default icon: {e}")
-            
-            last_weather_update = time.perf_counter()
-            check_prayer_time = True
-            
-            logger.info("Starting clock and weather display loop")
-            while True:
-                now = time.perf_counter()
-                current_time = get_date_time(True)[3]  # Get current time in HH:MM format
-                
-                # Check if we need to update weather data (every 1 hour)
-                if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
-                    logger.info("Weather update interval reached, refreshing data")
-                    c, l, h, i = get_openweather_data()
-                    if c and l and h and i and os.path.exists(i):
-                        current, lowest, highest, icon_path = c, l, h, i
-                        weather_image = load_image(icon_path, (24, 24))
-                        if weather_image:
-                            self.image = weather_image
-                            logger.info(f"Updated weather icon: {icon_path}")
-                    last_weather_update = now
-                
-                # Check if we need to refresh prayer times based on next prayer time
-                if check_prayer_time and next_prayer_time and current_time >= next_prayer_time:
-                    logger.info(f"Next prayer time reached: {next_prayer_time}, refreshing data")
-                    times = get_prayer_times()
-                    
-                    if times:
-                        next_prayer_time, prayer = get_next_prayer_time(times)
-                        logger.info(f"Successfully updated to new prayer times. Next prayer: {prayer} at {next_prayer_time}")
-                    else:
-                        # API failed, set a retry timer instead of showing default values
-                        logger.error("Failed to update prayer times when next prayer time was reached")
-                        next_prayer_time = None
-                        prayer = None
-                        check_prayer_time = False  # Temporarily disable prayer time checking
-                
-                # If API failed and retry timer is up, try again
-                if not check_prayer_time and now - last_weather_update > 60:  # Retry every minute
-                    logger.info("Retry timer elapsed, attempting to fetch prayer times again")
-                    times = get_prayer_times()
-                    if times:
-                        next_prayer_time, prayer = get_next_prayer_time(times)
-                        check_prayer_time = True  # Re-enable prayer time checking
-                        logger.info("Successfully recovered prayer times data")
-                    else:
-                        logger.warning("Still unable to fetch prayer times")
-                
-                # Clear canvas for new frame
-                canvas.Clear()
-                
-                # Get current time
-                day, dt, mo, clk = get_date_time()
-                
-                # Display weather icon if available
-                if hasattr(self, 'image') and self.image:
-                    canvas.SetImage(self.image, 44, -4, False)
-                
-                # Display calendar
-                graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
-                graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], dt)
-                graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], mo)
-                
-                # Display clock
-                graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
-                
-                # Display weather information if available
-                if current and highest and lowest:
-                    graphics.DrawText(canvas, self.font, 42, 30, self.color['skyBlue'], current)
-                    graphics.DrawText(canvas, self.fontSmall, 28, 25, self.color['pink'], highest)
-                    graphics.DrawText(canvas, self.fontSmall, 28, 31, self.color['lightBlue'], lowest)
-                else:
-                    # Display error message if weather API failed
-                    graphics.DrawText(canvas, self.fontSmall, 42, 30, self.color['error'], "W-ERR")
-                
-                # Display prayer information if available
-                if prayer and next_prayer_time:
-                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['grey'], str(prayer))
-                    graphics.DrawText(canvas, self.fontSmall, 5, 31, self.color['darkBlue'], str(next_prayer_time))
-                else:
-                    # Display error message if prayer API failed
-                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['error'], "P-ERR")
-                
-                # Update display
-                canvas = self.matrix.SwapOnVSync(canvas)
-                time.sleep(0.1)  # Small sleep to prevent high CPU usage
-        except KeyboardInterrupt:
-            logger.info("Clock and weather display interrupted by user")
-            return
-        except Exception as e:
-            logger.error(f"Error in display_clock_weather: {e}", exc_info=True)
-            return 
-        
-def get_openweather_data():
-    """Fetch weather data from OpenWeatherMap API"""
-    start_time = time.perf_counter()
-    logger.info('Fetching OpenWeatherMap data')
-    try:
-        if not WEATHER_APP_ID:
-            logger.warning("WEATHER_APP_ID environment variable not set")
-            return None, None, None, None
-            
-        logger.info(f"Making API request to OpenWeatherMap")
-        r = requests.get(
-            f'https://api.openweathermap.org/data/2.5/weather?id=4791160&APPID={WEATHER_APP_ID}&units=imperial',
-            headers={'Accept': 'application/json'})
-        
-        # Check if the request was successful
-        if r.status_code != 200:
-            logger.error(f"Weather API returned status code {r.status_code}")
-            return None, None, None, None
-            
-        j = r.json()
-        logger.info(f"Successfully received weather data: temp={j['main']['temp']}°F, " +
-                   f"min={j['main']['temp_min']}°F, max={j['main']['temp_max']}°F, " +
-                   f"conditions={j['weather'][0]['main']}")
-        
-        current = f"{round(j['main']['temp'])}°"
-        lowest = str(round(j['main']['temp_min']))
-        highest = str(round(j['main']['temp_max']))
-        
-        # Handle the icon
-        icon_code = j['weather'][0]['icon']
-        logger.info(f"Weather icon code: {icon_code}")
-        
-        # First ensure the directory exists to avoid permission errors
-        if not os.path.exists(WEATHER_ICONS_DIR):
-            try:
-                os.makedirs(WEATHER_ICONS_DIR, mode=0o777, exist_ok=True)
-                os.chmod(WEATHER_ICONS_DIR, 0o777)
-                logger.info(f"Created weather icons directory: {WEATHER_ICONS_DIR}")
-            except Exception as e:
-                logger.error(f"Failed to create weather icons directory: {e}")
-                # Use a fallback path in /tmp
-                fallback_dir = "/tmp/weather-icons"
-                os.makedirs(fallback_dir, mode=0o777, exist_ok=True)
-                logger.info(f"Using fallback path: {fallback_dir}")
-                icon_path = os.path.join(fallback_dir, f"{icon_code}.png")
-                return current, lowest, highest, icon_path
-        
-        icon_path = download_weather_icon(icon_code)
-        
-        if icon_path and os.path.exists(icon_path):
-            logger.info(f"Using weather icon: {icon_path}")
-        else:
-            logger.warning("Weather icon not found, will use default")
-            # Try to find any weather icon as a fallback
-            try:
-                if os.path.exists(WEATHER_ICONS_DIR):
-                    for filename in os.listdir(WEATHER_ICONS_DIR):
-                        if filename.endswith('.png') or filename.endswith('.jpg'):
-                            icon_path = os.path.join(WEATHER_ICONS_DIR, filename)
-                            logger.info(f"Using fallback weather icon: {icon_path}")
-                            break
-            except Exception as e:
-                logger.error(f"Error finding fallback icon: {e}")
-                icon_path = None
-        
-        end_time = time.perf_counter()
-        logger.info(f"Weather data fetched in {end_time - start_time:.2f} seconds")
-        return current, lowest, highest, icon_path
-    except Exception as e:
-        end_time = time.perf_counter()
-        logger.error(f"Error fetching weather data: {e}")
-        logger.error(f"Weather API call failed after {end_time - start_time:.2f} seconds")
-        return None, None, None, None#!/usr/bin/env python
+#!/usr/bin/env python
 import time
-from datetime import datetime, timedelta
-import threading
-from PIL import Image
+from datetime import datetime
+from PIL import Image, ImageDraw
 import logging
 import sys
 import os
 import argparse
 import requests
-import shutil
-from PIL import ImageDraw
-import pkg_resources
+from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
 
-# Configure logging with more detailed formatting
+# Configure logging - simplified
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'infocube.log'))
-    ]
+    format='[%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
-
-# Import RGB Matrix components
-try:
-    from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
-except ImportError:
-    logger.error("Failed to import rgbmatrix. Make sure it's properly installed.")
-    logger.error("Follow installation instructions at: https://github.com/hzeller/rpi-rgb-led-matrix")
-    sys.exit(1)
 
 #############################################
 #          Configuration Settings           #
@@ -242,202 +23,64 @@ except ImportError:
 # Get the WEATHER_APP_ID from environment variable
 WEATHER_APP_ID = os.getenv('WEATHER_APP_ID', '')
 
-# Determine the base directory for the project - this should work regardless of where the script is called from
+# Set up paths
 SCRIPT_PATH = os.path.abspath(__file__)
 SRC_DIR = os.path.dirname(SCRIPT_PATH)
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
 
-# Set up resource directories - create them if they don't exist
+# Resource directories
 RESOURCES_DIR = os.path.join(PROJECT_ROOT, "resources")
 IMAGES_DIR = os.path.join(RESOURCES_DIR, "images")
 GIF_DIR = os.path.join(IMAGES_DIR, "gifs")
 WEATHER_ICONS_DIR = os.path.join(IMAGES_DIR, "weather-icons")
-
-# Font paths - now inside resources directory
 FONT_DIR = os.path.join(RESOURCES_DIR, "fonts")
+
+# Font paths
 FONT_SMALL_PATH = os.path.join(FONT_DIR, "4x6.bdf")
 FONT_MEDIUM_PATH = os.path.join(FONT_DIR, "7x13.bdf")
-
-# Check for alternative font locations if needed
-ALT_FONT_DIRS = [
-    "/usr/local/share/fonts",
-    "/usr/share/fonts",
-    os.path.join(PROJECT_ROOT, "rpi-rgb-led-matrix", "fonts"),
-    os.path.expanduser("~/.local/share/fonts")
-]
 
 # Image paths
 WOOD_MISTRY_LOGO = os.path.join(IMAGES_DIR, "wm.jpg")
 MOSQUE_LOGO = os.path.join(IMAGES_DIR, "mosque.jpg")
 
-# GIF paths - populated dynamically
-GIFS = {}
-
 # Prayer names
 PRAYER_NAMES = ('Fajr', 'Zuhr', 'Asr', 'Magh', 'Isha')
 
-# Weather icons mapping (OpenWeatherMap code to icon filename)
-WEATHER_ICONS = {
-    '01d': 'clear-day.png',
-    '01n': 'clear-night.png',
-    '02d': 'partly-cloudy-day.png',
-    '02n': 'partly-cloudy-night.png',
-    '03d': 'cloudy.png',
-    '03n': 'cloudy.png',
-    '04d': 'cloudy.png',
-    '04n': 'cloudy.png',
-    '09d': 'rain.png',
-    '09n': 'rain.png',
-    '10d': 'rain.png',
-    '10n': 'rain.png',
-    '11d': 'thunderstorm.png',
-    '11n': 'thunderstorm.png',
-    '13d': 'snow.png',
-    '13n': 'snow.png',
-    '50d': 'fog.png',
-    '50n': 'fog.png'
-}
-
-# Fallback icon if OpenWeatherMap icon code is not recognized
-DEFAULT_WEATHER_ICON = 'cloudy.png'
+# Default images for when files aren't found
+DEFAULT_WEATHER_ICON = Image.new('RGB', (24, 24), color=(0, 0, 0))
+DEFAULT_DRAW = ImageDraw.Draw(DEFAULT_WEATHER_ICON)
+DEFAULT_DRAW.ellipse((4, 4, 20, 20), fill=(255, 255, 0))  # Simple sun icon
 
 # Update intervals (in seconds)
 WEATHER_UPDATE_INTERVAL = 3600  # 1 hour
-LOG_LEVEL = logging.INFO
 
-def setup_directories():
-    """Create all required directories and initialize GIFS dictionary"""
-    global GIFS
-    
-    dirs_to_create = [RESOURCES_DIR, IMAGES_DIR, GIF_DIR, WEATHER_ICONS_DIR, FONT_DIR]
-    
-    for directory in dirs_to_create:
-        ensure_directory_exists(directory)
-    
-    # Set up GIFs dictionary dynamically
-    if os.path.exists(GIF_DIR):
-        for gif_file in os.listdir(GIF_DIR):
-            if gif_file.endswith('.gif'):
-                gif_name = os.path.splitext(gif_file)[0]
-                GIFS[gif_name] = os.path.join(GIF_DIR, gif_file)
-    
-    # If GIFS is empty, add some default entries (they won't work until the files exist)
-    if not GIFS:
-        default_gifs = ['fireplace', 'matrix', 'nebula', 'hyperloop', 'spacetravel', 'retro']
-        for gif_name in default_gifs:
-            GIFS[gif_name] = os.path.join(GIF_DIR, f"{gif_name}.gif")
-    
-    logger.info(f"Found {len(GIFS)} GIFs: {', '.join(GIFS.keys())}")
-    
-    # Check for fonts and note their paths
-    find_fonts()
+def check_directories():
+    """Check that required directories exist"""
+    dirs = [RESOURCES_DIR, IMAGES_DIR, GIF_DIR, WEATHER_ICONS_DIR, FONT_DIR]
+    for directory in dirs:
+        if os.path.exists(directory):
+            logger.info(f"Using directory: {directory}")
+        else:
+            logger.warning(f"Directory does not exist: {directory}")
 
-def find_fonts():
-    """Check for available fonts and set paths"""
-    global FONT_SMALL_PATH, FONT_MEDIUM_PATH
-    
-    # Check if default font paths exist
-    if not os.path.exists(FONT_SMALL_PATH):
-        logger.warning(f"Small font not found at {FONT_SMALL_PATH}")
-        
-        # Look for fonts in alternative locations
-        for font_dir in ALT_FONT_DIRS:
-            if os.path.exists(font_dir):
-                logger.info(f"Checking {font_dir} for fonts...")
-                
-                # Look for 4x6.bdf
-                small_font_path = os.path.join(font_dir, "4x6.bdf")
-                if os.path.exists(small_font_path):
-                    FONT_SMALL_PATH = small_font_path
-                    logger.info(f"Found small font at {FONT_SMALL_PATH}")
-                    break
-                
-                # Look for any .bdf font
-                for file in os.listdir(font_dir):
-                    if file.endswith('.bdf'):
-                        FONT_SMALL_PATH = os.path.join(font_dir, file)
-                        logger.info(f"Using alternative small font: {FONT_SMALL_PATH}")
-                        break
-                
-                if os.path.exists(FONT_SMALL_PATH):
-                    break
-    
-    if not os.path.exists(FONT_MEDIUM_PATH):
-        logger.warning(f"Medium font not found at {FONT_MEDIUM_PATH}")
-        
-        # Look for 7x13.bdf
-        for font_dir in ALT_FONT_DIRS:
-            if os.path.exists(font_dir):
-                medium_font_path = os.path.join(font_dir, "7x13.bdf")
-                if os.path.exists(medium_font_path):
-                    FONT_MEDIUM_PATH = medium_font_path
-                    logger.info(f"Found medium font at {FONT_MEDIUM_PATH}")
-                    break
-                
-                # If we already found a small font, use that as a fallback
-                if os.path.exists(FONT_SMALL_PATH):
-                    FONT_MEDIUM_PATH = FONT_SMALL_PATH
-                    logger.info(f"Using small font as fallback for medium font")
-                    break
+def get_date_time(h24format=False):
+    """Get formatted date and time"""
+    tm = datetime.now()
+    day = tm.strftime('%a')
+    date = tm.strftime('%d')
+    month = tm.strftime('%b')
+    time_str = tm.strftime('%H:%M') if h24format else tm.strftime('%I:%M%p')[:-1].lower()
+    return day, date, month, time_str
 
-#############################################
-#              Utility Functions            #
-#############################################
-def get_date_time(h24format=False, minus_mins=0):
-    tm = datetime.now() - timedelta(minutes=minus_mins)
-    return tm.strftime('%a'), \
-           tm.strftime('%d'), \
-           tm.strftime('%b'), \
-           tm.strftime('%H:%M') if h24format else tm.strftime('%I:%M%p')[:-1].lower()
-
-def ensure_directory_exists(directory):
-    """Make sure the directory exists, create it if it doesn't"""
-    if not os.path.exists(directory):
-        try:
-            # Create directory with explicit permissions
-            os.makedirs(directory, mode=0o777, exist_ok=True)
-            logger.info(f"Created directory: {directory}")
-            # Ensure permissions after creation
-            os.chmod(directory, 0o777)
-        except Exception as e:
-            logger.error(f"Error creating directory {directory}: {e}")
-            return False
-    return True
-
-def download_weather_icon(icon_code):
-    """Download a weather icon from OpenWeatherMap if it doesn't exist locally"""
-    # Make sure weather icons directory exists
-    if not ensure_directory_exists(WEATHER_ICONS_DIR):
-        return None
-    
-    # Define the icon path
+def get_weather_icon_path(icon_code):
+    """Get the path to a weather icon file"""
     icon_path = os.path.join(WEATHER_ICONS_DIR, f"{icon_code}.png")
-    
-    # If the icon already exists, return the path
     if os.path.exists(icon_path):
         return icon_path
     else:
-        logging.info(f"Icon Path: {icon_path}")
-    # If the icon doesn't exist, download it from OpenWeatherMap
-    try:
-        # Construct the OpenWeatherMap icon URL
-        icon_url = f"http://openweathermap.org/img/wn/{icon_code}.png"
-        logger.info(f"Downloading weather icon: {icon_url}")
-        
-        # Download the icon
-        response = requests.get(icon_url, stream=True)
-        if response.status_code == 200:
-            with open(icon_path, 'wb') as f:
-                response.raw.decode_content = True
-                shutil.copyfileobj(response.raw, f)
-            logger.info(f"Downloaded weather icon to {icon_path}")
-            return icon_path
-        else:
-            logger.warning(f"Failed to download weather icon, status code: {response.status_code}")
-            return None
-    except Exception as e:
-        logger.error(f"Error downloading weather icon: {e}")
-        return None
+        # Return a default icon path if the specific one doesn't exist
+        default_icon = os.path.join(WEATHER_ICONS_DIR, "01d.png")  # Clear day as default
+        return default_icon if os.path.exists(default_icon) else None
 
 def get_openweather_data():
     """Fetch weather data from OpenWeatherMap API"""
@@ -451,7 +94,6 @@ def get_openweather_data():
             f'https://api.openweathermap.org/data/2.5/weather?id=4791160&APPID={WEATHER_APP_ID}&units=imperial',
             headers={'Accept': 'application/json'})
         
-        # Check if the request was successful
         if r.status_code != 200:
             logger.error(f"Weather API returned status code {r.status_code}")
             return None, None, None, None
@@ -461,41 +103,9 @@ def get_openweather_data():
         lowest = str(round(j['main']['temp_min']))
         highest = str(round(j['main']['temp_max']))
         
-        # Handle the icon
+        # Get the icon path
         icon_code = j['weather'][0]['icon']
-        logger.info(f"Icon Path: {WEATHER_ICONS_DIR} {icon_code}")
-        
-        # First ensure the directory exists to avoid permission errors
-        if not os.path.exists(WEATHER_ICONS_DIR):
-            try:
-                os.makedirs(WEATHER_ICONS_DIR, mode=0o777, exist_ok=True)
-                os.chmod(WEATHER_ICONS_DIR, 0o777)
-                logger.info(f"Created weather icons directory: {WEATHER_ICONS_DIR}")
-            except Exception as e:
-                logger.error(f"Failed to create weather icons directory: {e}")
-                # Use a fallback path in /tmp
-                fallback_dir = "/tmp/weather-icons"
-                os.makedirs(fallback_dir, mode=0o777, exist_ok=True)
-                logger.info(f"Using fallback path: {fallback_dir}")
-                icon_path = os.path.join(fallback_dir, f"{icon_code}.png")
-                return current, lowest, highest, icon_path
-        
-        icon_path = download_weather_icon(icon_code)
-        
-        if icon_path and os.path.exists(icon_path):
-            logger.info(f"Using weather icon: {icon_path}")
-        else:
-            logger.warning("Weather icon not found, will use default")
-            # Try to find any weather icon as a fallback
-            try:
-                if os.path.exists(WEATHER_ICONS_DIR):
-                    for filename in os.listdir(WEATHER_ICONS_DIR):
-                        if filename.endswith('.png') or filename.endswith('.jpg'):
-                            icon_path = os.path.join(WEATHER_ICONS_DIR, filename)
-                            break
-            except Exception as e:
-                logger.error(f"Error finding fallback icon: {e}")
-                icon_path = None
+        icon_path = get_weather_icon_path(icon_code)
         
         return current, lowest, highest, icon_path
     except Exception as e:
@@ -504,14 +114,11 @@ def get_openweather_data():
 
 def get_prayer_times():
     """Fetch prayer times"""
-    start_time = time.perf_counter()
     logger.info('Fetching prayer times from API')
     try:
-        logger.info("Making API request to Aladhan.com")
         r = requests.get('http://api.aladhan.com/v1/timings?latitude=38.903481&longitude=-77.262817&method=1&school=1',
                          headers={'Accept': 'application/json'})
         
-        # Check if the request was successful
         if r.status_code != 200:
             logger.error(f"Prayer times API returned status code {r.status_code}")
             return None
@@ -520,40 +127,11 @@ def get_prayer_times():
         timings = j['data']['timings']
         fajr, dhuhr, asr, maghrib, isha = timings['Fajr'], timings['Dhuhr'], timings['Asr'], timings['Maghrib'], timings['Isha']
         
-        logger.info(f"Successfully received prayer times: Fajr={fajr}, Dhuhr={dhuhr}, " +
-                   f"Asr={asr}, Maghrib={maghrib}, Isha={isha}")
-        
-        end_time = time.perf_counter()
-        logger.info(f"Prayer times fetched in {end_time - start_time:.2f} seconds")
+        logger.info(f"Received prayer times: Fajr={fajr}, Dhuhr={dhuhr}, Asr={asr}, Maghrib={maghrib}, Isha={isha}")
         return fajr, dhuhr, asr, maghrib, isha
     except Exception as e:
-        end_time = time.perf_counter()
         logger.error(f"Error fetching prayer times: {e}")
-        logger.error(f"Prayer times API call failed after {end_time - start_time:.2f} seconds")
         return None
-
-def prayer_time_passed(time_str):
-    """Check if a prayer time has passed or is current"""
-    try:
-        # Get current time in 24-hour format
-        _, _, _, current_time = get_date_time(True)
-        
-        # Convert strings to comparable format (remove any leading/trailing spaces)
-        current_time = current_time.strip()
-        time_str = time_str.strip()
-        
-        # Log the comparison for debugging
-        logger.debug(f"Comparing prayer time {time_str} with current time {current_time}")
-        
-        # Compare the times
-        result = time_str <= current_time
-        if result:
-            logger.info(f"Prayer time {time_str} has passed (current time: {current_time})")
-        
-        return result
-    except Exception as e:
-        logger.error(f"Error comparing prayer times: {e}")
-        return False
 
 def get_next_prayer_time(times):
     """
@@ -561,14 +139,12 @@ def get_next_prayer_time(times):
     Returns (time, name) tuple or (None, None) if times is None
     """
     if not times:
-        logger.warning("Cannot get next prayer time: prayer times data is None")
         return None, None
         
-    day, dt, mo, clk = get_date_time(True)
-    logger.info(f"Getting next prayer time. Current time: {clk}")
+    _, _, _, current_time = get_date_time(True)
     
     for i in range(5):
-        if times[i] > clk:
+        if times[i] > current_time:
             logger.info(f"Next prayer is {PRAYER_NAMES[i]} at {times[i]}")
             return times[i], PRAYER_NAMES[i]
     
@@ -576,135 +152,49 @@ def get_next_prayer_time(times):
     logger.info(f"All prayer times for today have passed. Next prayer is {PRAYER_NAMES[0]} at {times[0]} tomorrow")
     return times[0], PRAYER_NAMES[0]
 
-def load_image(image_path, size=None, bg_color=(0, 0, 0, 255)):
-    """Load an image with error handling, resizing and proper transparency handling"""
+def load_image(image_path, size=None):
+    """Load an image with error handling and optional resizing"""
     if not os.path.exists(image_path):
         logger.error(f"Image file not found: {image_path}")
         return None
 
     try:
-        logger.info(f"Loading image: {image_path}")
-        start_time = time.perf_counter()
-        
-        # First load as RGBA to preserve transparency information
-        image = Image.open(image_path).convert('RGBA')
-        
-        # Create a background of the specified color
-        background = Image.new('RGBA', image.size, bg_color)
-        
-        # Composite the image onto the background
-        image = Image.alpha_composite(background, image)
-        
-        # Convert to RGB for display
-        image = image.convert('RGB')
+        image = Image.open(image_path).convert('RGB')
         
         if size:
-            original_size = image.size
-            # Use LANCZOS resampling for high-quality downsampling
-            image_resize_method = Image.LANCZOS if hasattr(Image, 'LANCZOS') else Image.ANTIALIAS
-            image.thumbnail(size, image_resize_method)
-            logger.info(f"Resized image from {original_size} to {image.size}")
-        
-        end_time = time.perf_counter()
-        logger.info(f"Image loaded in {end_time - start_time:.2f} seconds")
+            # Use LANCZOS for best quality resizing
+            image.thumbnail(size, Image.LANCZOS)
+            
         return image
     except Exception as e:
         logger.error(f"Error loading image {image_path}: {e}")
         return None
 
 #############################################
-#              SampleBase Class             #
-#############################################
-class SampleBase(object):
-    def __init__(self, *args, **kwargs):
-        self.parser = argparse.ArgumentParser()
-
-        # Updated default arguments to match requested settings
-        self.parser.add_argument("-r", "--led-rows", action="store", help="Display rows. 16 for 16x32, 32 for 32x32. Default: 32", default=32, type=int)
-        self.parser.add_argument("--led-cols", action="store", help="Panel columns. Typically 32 or 64. (Default: 64)", default=64, type=int)
-        self.parser.add_argument("-c", "--led-chain", action="store", help="Daisy-chained boards. Default: 1.", default=1, type=int)
-        self.parser.add_argument("-P", "--led-parallel", action="store", help="For Plus-models or RPi2: parallel chains. 1..3. Default: 1", default=1, type=int)
-        self.parser.add_argument("-p", "--led-pwm-bits", action="store", help="Bits used for PWM. Something between 1..11. Default: 11", default=11, type=int)
-        self.parser.add_argument("-b", "--led-brightness", action="store", help="Sets brightness level. Default: 40. Range: 1..100", default=40, type=int)
-        self.parser.add_argument("-m", "--led-gpio-mapping", help="Hardware Mapping: regular, adafruit-hat, adafruit-hat-pwm" , choices=['regular', 'regular-pi1', 'adafruit-hat', 'adafruit-hat-pwm'], default='adafruit-hat', type=str)
-        self.parser.add_argument("--led-scan-mode", action="store", help="Progressive or interlaced scan. 0 Progressive, 1 Interlaced (default)", default=1, choices=range(2), type=int)
-        self.parser.add_argument("--led-pwm-lsb-nanoseconds", action="store", help="Base time-unit for the on-time in the lowest significant bit in nanoseconds. Default: 130", default=130, type=int)
-        self.parser.add_argument("--led-show-refresh", action="store_true", help="Shows the current refresh rate of the LED panel")
-        self.parser.add_argument("--led-slowdown-gpio", action="store", help="Slow down writing to GPIO. Range: 0..4. Default: 1", default=1, type=int)
-        self.parser.add_argument("--led-no-hardware-pulse", action="store", help="Don't use hardware pin-pulse generation")
-        self.parser.add_argument("--led-rgb-sequence", action="store", help="Switch if your matrix has led colors swapped. Default: RBG", default="RBG", type=str)
-        self.parser.add_argument("--led-pixel-mapper", action="store", help="Apply pixel mappers. e.g \"Rotate:90\"", default="", type=str)
-        self.parser.add_argument("--led-row-addr-type", action="store", help="0 = default; 1=AB-addressed panels; 2=row direct; 3=ABC-addressed panels; 4 = ABC Shift + DE direct", default=0, type=int, choices=[0,1,2,3,4])
-        self.parser.add_argument("--led-multiplexing", action="store", help="Multiplexing type: 0=direct; 1=strip; 2=checker; 3=spiral; 4=ZStripe; 5=ZnMirrorZStripe; 6=coreman; 7=Kaler2Scan; 8=ZStripeUneven... (Default: 0)", default=0, type=int)
-        self.parser.add_argument("--led-panel-type", action="store", help="Needed to initialize special panels. Supported: 'FM6126A'", default="", type=str)
-        self.parser.add_argument("--led-no-drop-privs", dest="drop_privileges", help="Don't drop privileges from 'root' after initializing the hardware.", action='store_true')
-        self.parser.add_argument("--display-mode", action="store", help="Display mode: clock, prayer, gif, intro", default="clock", type=str)
-        self.parser.add_argument("--gif-name", action="store", help="GIF to display (if display-mode is 'gif')", default="matrix", type=str)
-        self.parser.set_defaults(drop_privileges=False)  # Changed default to match --led-no-drop-privs
-
-    def usleep(self, value):
-        time.sleep(value / 1000000.0)
-
-    def run(self):
-        print("Running")
-
-    def process(self):
-        self.args = self.parser.parse_args()
-
-        options = RGBMatrixOptions()
-
-        if self.args.led_gpio_mapping != None:
-          options.hardware_mapping = self.args.led_gpio_mapping
-        options.rows = self.args.led_rows
-        options.cols = self.args.led_cols
-        options.chain_length = self.args.led_chain
-        options.parallel = self.args.led_parallel
-        options.row_address_type = self.args.led_row_addr_type
-        options.multiplexing = self.args.led_multiplexing
-        options.pwm_bits = self.args.led_pwm_bits
-        options.brightness = self.args.led_brightness
-        options.pwm_lsb_nanoseconds = self.args.led_pwm_lsb_nanoseconds
-        options.led_rgb_sequence = self.args.led_rgb_sequence
-        options.pixel_mapper_config = self.args.led_pixel_mapper
-        options.panel_type = self.args.led_panel_type
-
-        if self.args.led_show_refresh:
-          options.show_refresh_rate = 1
-
-        if self.args.led_slowdown_gpio != None:
-            options.gpio_slowdown = self.args.led_slowdown_gpio
-        if self.args.led_no_hardware_pulse:
-          options.disable_hardware_pulsing = True
-        if not self.args.drop_privileges:
-          options.drop_privileges=False
-
-        self.matrix = RGBMatrix(options = options)
-
-        try:
-            # Start loop
-            logger.info("Press CTRL-C to stop")
-            self.run()
-        except KeyboardInterrupt:
-            logger.info("Exiting\n")
-            # Clear the display when done
-            canvas = self.matrix.CreateFrameCanvas()
-            canvas.Clear()
-            self.matrix.SwapOnVSync(canvas)
-            sys.exit(0)
-        except Exception as e:
-            logger.error(f"Error in main loop: {e}")
-            sys.exit(1)
-
-        return True
-
-#############################################
 #              InfoCube Class               #
 #############################################
-class InfoCube(SampleBase):
+class InfoCube:
     image = None
     
-    def __init__(self, *args, **kwargs):
-        super(InfoCube, self).__init__(*args, **kwargs)
+    def __init__(self, display_mode="clock", gif_name="matrix"):
+        self.display_mode = display_mode
+        self.gif_name = gif_name
+        
+        # Setup matrix with fixed parameters for 32x64 display
+        options = RGBMatrixOptions()
+        options.rows = 32
+        options.cols = 64
+        options.chain_length = 1
+        options.parallel = 1
+        options.brightness = 40
+        options.hardware_mapping = 'adafruit-hat'
+        options.gpio_slowdown = 2
+        options.rgb_sequence = 'RBG'
+        options.drop_privileges = False  # --led-no-drop-privs always enabled
+        
+        self.matrix = RGBMatrix(options=options)
+        
+        # Define colors
         self.color = {
             'white': graphics.Color(255, 255, 255),
             'orange': graphics.Color(255, 165, 0),
@@ -718,395 +208,270 @@ class InfoCube(SampleBase):
             'darkBlue': graphics.Color(30, 144, 255),
             'grey': graphics.Color(150, 150, 150),
             'pink': graphics.Color(255, 114, 118),
-            'error': graphics.Color(255, 0, 0)  # Error color
+            'error': graphics.Color(255, 0, 0)
         }
         
+        # Load fonts - assuming they exist in resources/fonts
+        logger.info(f"Loading fonts from {FONT_DIR}")
         self.fontSmall = graphics.Font()
         self.font = graphics.Font()
-        
-        # Ensure all directories exist
-        setup_directories()
-        
-        # Load fonts
         try:
-            if os.path.exists(FONT_SMALL_PATH):
-                self.fontSmall.LoadFont(FONT_SMALL_PATH)
-            else:
-                logger.error(f"Small font not found at {FONT_SMALL_PATH}")
-                # Try to find any fonts
-                for font_dir in [FONT_DIR] + ALT_FONT_DIRS:
-                    if os.path.exists(font_dir):
-                        for file in os.listdir(font_dir):
-                            if file.endswith('.bdf'):
-                                try:
-                                    font_path = os.path.join(font_dir, file)
-                                    self.fontSmall.LoadFont(font_path)
-                                    logger.info(f"Using fallback small font: {font_path}")
-                                    break
-                                except Exception as e:
-                                    logger.error(f"Failed to load font {file}: {e}")
-                                    continue
-                        if hasattr(self.fontSmall, 'height') and self.fontSmall.height > 0:
-                            break
-            
-            if os.path.exists(FONT_MEDIUM_PATH):
-                self.font.LoadFont(FONT_MEDIUM_PATH)
-            else:
-                logger.error(f"Medium font not found at {FONT_MEDIUM_PATH}")
-                # Use the same font as small if available
-                if hasattr(self, 'fontSmall') and self.fontSmall and hasattr(self.fontSmall, 'height') and self.fontSmall.height > 0:
-                    self.font = self.fontSmall
-                    logger.info("Using small font as medium font")
+            self.fontSmall.LoadFont(FONT_SMALL_PATH)
+            self.font.LoadFont(FONT_MEDIUM_PATH)
         except Exception as e:
-            logger.error(f"Failed to load fonts: {e}")
-            logger.info(f"Looking for fonts in {FONT_DIR}")
-
+            logger.error(f"Error loading fonts: {e}")
+    
     def run(self):
-        # Get the display mode from command line
-        display_mode = self.args.display_mode
+        """Run the InfoCube with the selected display mode"""
         canvas = self.matrix.CreateFrameCanvas()
         
-        logger.info(f"Starting with display mode: {display_mode}")
-        
-        # Run the appropriate display function based on mode
-        if display_mode == "clock":
-            self.display_clock_weather(canvas)
-        elif display_mode == "prayer":
-            self.display_prayer_times(canvas)
-        elif display_mode == "gif":
-            self.display_gif(canvas, self.args.gif_name)
-        elif display_mode == "intro":
-            self.display_wm_logo(canvas)
-        else:
-            self.display_hmarquee(canvas, f"Welcome to InfoCube - {display_mode} mode")
-
-    def display_wm_logo(self, canvas):
-        canvas.Clear()
         try:
-            # Load the logo image
-            image = load_image(WOOD_MISTRY_LOGO)
-            if image:
-                canvas.SetImage(image, 0, 0, False)
-                canvas = self.matrix.SwapOnVSync(canvas)
-                start_time = time.perf_counter()
-                while True:
-                    now = time.perf_counter()
-                    time.sleep(1)
-                    if (now - start_time) > 5:  # Show for 5 seconds
-                        logger.info(f"Returning out of display_wm_logo")
-                        return
-            else:
-                logger.error(f"Logo file not found at {WOOD_MISTRY_LOGO}")
-                self.display_hmarquee(canvas, "InfoCube")
-        except Exception as e:
-            logger.error(f"Error displaying logo: {e}")
-            return
-
-    def display_prayer_times(self, canvas):
-        try:
-            # Get initial prayer times
-            logger.info("Initializing prayer times display")
-            times = get_prayer_times()
+            logger.info(f"Starting with display mode: {self.display_mode}")
             
-            # Handle case when API fails
-            if not times:
-                logger.error("Failed to get initial prayer times, showing error message")
-                canvas.Clear()
-                graphics.DrawText(canvas, self.font, 3, 18, self.color['error'], "API ERR")
-                canvas = self.matrix.SwapOnVSync(canvas)
-                time.sleep(30)  # Wait 30 seconds before trying again
-                return
-                
-            next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+            if self.display_mode == "clock":
+                self.display_clock_weather(canvas)
+            elif self.display_mode == "prayer":
+                self.display_prayer_times(canvas)
+            elif self.display_mode == "gif":
+                self.display_gif(canvas, self.gif_name)
+            elif self.display_mode == "intro":
+                self.display_wm_logo(canvas)
+            else:
+                self.display_hmarquee(canvas, f"Welcome to InfoCube - {self.display_mode} mode")
+        except KeyboardInterrupt:
+            logger.info("Exiting...")
+            canvas.Clear()
+            self.matrix.SwapOnVSync(canvas)
+        except Exception as e:
+            logger.error(f"Error in main loop: {e}")
+    
+    def display_wm_logo(self, canvas):
+        """Display the Wood Mistry logo"""
+        canvas.Clear()
+        image = load_image(WOOD_MISTRY_LOGO)
+        if image:
+            canvas.SetImage(image, 0, 0, False)
+            canvas = self.matrix.SwapOnVSync(canvas)
+            time.sleep(5)  # Show for 5 seconds
+        else:
+            self.display_hmarquee(canvas, "InfoCube")
+    
+    def display_prayer_times(self, canvas):
+        """Display prayer times"""
+        # Get initial prayer times
+        times = get_prayer_times()
+        next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+        
+        # Load mosque logo if available
+        mosque_image = load_image(MOSQUE_LOGO)
+        if mosque_image:
+            self.image = mosque_image
+        
+        last_update_time = time.perf_counter()
+        
+        while True:
+            now = time.perf_counter()
+            _, _, _, current_time = get_date_time(True)  # Get current time in HH:MM format
+            
+            # Check if we need to refresh prayer times based on next prayer time
+            if next_prayer_time and current_time >= next_prayer_time:
+                times = get_prayer_times()
+                if times:
+                    next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+                    last_update_time = now
+            
+            # If API failed, retry every minute
+            if not times and now - last_update_time > 60:
+                times = get_prayer_times()
+                if times:
+                    next_prayer_time, next_prayer_name = get_next_prayer_time(times)
+                last_update_time = now
+            
             canvas.Clear()
             
-            # Load mosque logo if available
-            mosque_image = load_image(MOSQUE_LOGO)
-            if mosque_image:
-                canvas.SetImage(mosque_image, 44, 2, False)
-                self.image = mosque_image  # Store for reuse
-                logger.info("Loaded mosque logo for prayer times display")
+            # Display mosque image if available
+            if self.image:
+                canvas.SetImage(self.image, 44, 2, False)
+            
+            if times:
+                # Display prayer times
+                for i in range(5):
+                    # Highlight the next prayer
+                    timecolor = self.color['orange'] if times[i] == next_prayer_time else self.color['white']
+                    graphics.DrawText(canvas, self.fontSmall, 5, (i+1)*6, self.color['skyBlue'], str(PRAYER_NAMES[i]))
+                    graphics.DrawText(canvas, self.fontSmall, 23, (i+1)*6, timecolor, str(times[i]))
             else:
-                logger.warning("Mosque logo not found or could not be loaded")
+                # Display error message if API failed
+                graphics.DrawText(canvas, self.fontSmall, 5, 15, self.color['error'], "Prayer API Error")
+                graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['white'], "Retrying...")
             
-            last_update_time = time.perf_counter()
-            check_prayer_time = True
-            
-            logger.info("Starting prayer times display loop")
-            while True:
-                now = time.perf_counter()
-                current_time = get_date_time(True)[3]  # Get current time in HH:MM format
-                
-                # Check if we need to refresh prayer times based on next prayer time
-                if check_prayer_time and next_prayer_time and current_time >= next_prayer_time:
-                    logger.info(f"Next prayer time reached: {next_prayer_time}, refreshing data")
-                    times = get_prayer_times()
-                    
-                    if times:
-                        next_prayer_time, next_prayer_name = get_next_prayer_time(times)
-                        last_update_time = now
-                        logger.info(f"Successfully updated to new prayer times. Next prayer: {next_prayer_name} at {next_prayer_time}")
-                    else:
-                        # API failed, set a retry timer instead of showing default values
-                        logger.error("Failed to update prayer times when next prayer time was reached")
-                        next_prayer_time = None
-                        next_prayer_name = None
-                        check_prayer_time = False  # Temporarily disable prayer time checking
-                        
-                # If API failed and retry timer is up, try again
-                if not check_prayer_time and now - last_update_time > 60:  # Retry every minute
-                    logger.info("Retry timer elapsed, attempting to fetch prayer times again")
-                    times = get_prayer_times()
-                    if times:
-                        next_prayer_time, next_prayer_name = get_next_prayer_time(times)
-                        check_prayer_time = True  # Re-enable prayer time checking
-                        logger.info("Successfully recovered prayer times data")
-                    else:
-                        logger.warning("Still unable to fetch prayer times")
-                    last_update_time = now
-                
-                canvas.Clear()
-                # Display mosque image if available
-                if self.image:
-                    canvas.SetImage(self.image, 44, 2, False)
-                
-                if times:
-                    # Display prayer times
-                    for i in range(5):
-                        # Highlight the next prayer
-                        timecolor = self.color['orange'] if times[i] == next_prayer_time else self.color['white']
-                        graphics.DrawText(canvas, self.fontSmall, 5, (i+1)*6, self.color['skyBlue'], str(PRAYER_NAMES[i]))
-                        graphics.DrawText(canvas, self.fontSmall, 23, (i+1)*6, timecolor, str(times[i]))
-                else:
-                    # Display error message if API failed
-                    graphics.DrawText(canvas, self.fontSmall, 5, 15, self.color['error'], "Prayer API Error")
-                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['white'], "Retrying...")
-                
-                canvas = self.matrix.SwapOnVSync(canvas)
-                time.sleep(0.1)  # Small sleep to prevent high CPU usage
-        except KeyboardInterrupt:
-            logger.info("Prayer times display interrupted by user")
-            return
-        except Exception as e:
-            logger.error(f"Error in display_prayer_times: {e}")
-            return
-
-    def display_clock_weather(self, canvas):
-        try:
-            # Get initial data
-            day, dt, mo, clk = get_date_time()
-            times = get_prayer_times()
-            next_prayer_time, prayer = get_next_prayer_time(times)
-            
-            # Display calendar and date while weather data loads
-            graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
-            graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], dt)
-            graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], mo)
-            # Display time
-            graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
             canvas = self.matrix.SwapOnVSync(canvas)
+            time.sleep(0.1)
+    
+    def display_clock_weather(self, canvas):
+        """Display clock and weather information"""
+        # Get initial data
+        times = get_prayer_times()
+        next_prayer_time, prayer = get_next_prayer_time(times)
+        
+        # Fetch weather data
+        current, lowest, highest, icon_path = get_openweather_data()
+        if icon_path and os.path.exists(icon_path):
+            weather_image = load_image(icon_path, (24, 24))
+            if weather_image:
+                self.image = weather_image
+        else:
+            # Use default weather icon
+            self.image = DEFAULT_WEATHER_ICON
+        
+        last_weather_update = time.perf_counter()
+        
+        while True:
+            now = time.perf_counter()
+            _, _, _, current_time = get_date_time(True)  # Get current time in HH:MM format
             
-            # Create a default weather icon if needed
-            default_icon = None
+            # Update weather data every 1 hour
+            if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
+                c, l, h, i = get_openweather_data()
+                if c and l and h and i:
+                    current, lowest, highest, icon_path = c, l, h, i
+                    weather_image = load_image(icon_path, (24, 24))
+                    if weather_image:
+                        self.image = weather_image
+                last_weather_update = now
             
-            # Fetch weather data
-            current, lowest, highest, icon_path = get_openweather_data()
-            if icon_path and os.path.exists(icon_path):
-                weather_image = load_image(icon_path, (24, 24))
-                if weather_image:
-                    self.image = weather_image
-            elif not hasattr(self, 'image') or self.image is None:
-                # If no weather icon is available, create a simple icon
-                logger.info("Creating a default weather icon")
-                try:
-                    # Create a blank icon
-                    default_icon = Image.new('RGB', (24, 24), color=(0, 0, 0))
-                    draw = ImageDraw.Draw(default_icon)
-                    # Draw a simple sun
-                    draw.ellipse((4, 4, 20, 20), fill=(255, 255, 0))
-                    self.image = default_icon
-                except Exception as e:
-                    logger.error(f"Failed to create default icon: {e}")
+            # Check if we need to refresh prayer times
+            if next_prayer_time and current_time >= next_prayer_time:
+                times = get_prayer_times()
+                if times:
+                    next_prayer_time, prayer = get_next_prayer_time(times)
             
-            last_weather_update = time.perf_counter()
-            check_prayer_time = True
+            # Clear canvas for new frame
+            canvas.Clear()
             
-            while True:
-                now = time.perf_counter()
-                current_time = get_date_time(True)[3]  # Get current time in HH:MM format
-                
-                # Check if we need to update weather data (every 3 hours)
-                if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
-                    logger.info("Weather update interval reached, refreshing data")
-                    c, l, h, i = get_openweather_data()
-                    if c and l and h and i and os.path.exists(i):
-                        current, lowest, highest, icon_path = c, l, h, i
-                        weather_image = load_image(icon_path, (24, 24))
-                        if weather_image:
-                            self.image = weather_image
-                    last_weather_update = now
-                
-                # Check if we need to refresh prayer times based on next prayer time
-                if check_prayer_time and next_prayer_time and current_time >= next_prayer_time:
-                    logger.info(f"Next prayer time reached: {next_prayer_time}, refreshing data")
-                    times = get_prayer_times()
-                    
-                    if times:
-                        next_prayer_time, prayer = get_next_prayer_time(times)
-                    else:
-                        # API failed, set a retry timer instead of showing default values
-                        next_prayer_time = None
-                        prayer = None
-                        check_prayer_time = False  # Temporarily disable prayer time checking
-                
-                # If API failed and retry timer is up, try again
-                if not check_prayer_time and now - last_weather_update > 60:  # Retry every minute
-                    times = get_prayer_times()
-                    if times:
-                        next_prayer_time, prayer = get_next_prayer_time(times)
-                        check_prayer_time = True  # Re-enable prayer time checking
-                
-                # Clear canvas for new frame
+            # Get current time
+            day, date, month, clock = get_date_time()
+            
+            # Display weather icon if available
+            if self.image:
+                canvas.SetImage(self.image, 44, -4, False)
+            
+            # Display calendar
+            graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
+            graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], date)
+            graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], month)
+            
+            # Display clock
+            graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clock)
+            
+            # Display weather information if available
+            if current and highest and lowest:
+                graphics.DrawText(canvas, self.font, 42, 30, self.color['skyBlue'], current)
+                graphics.DrawText(canvas, self.fontSmall, 28, 25, self.color['pink'], highest)
+                graphics.DrawText(canvas, self.fontSmall, 28, 31, self.color['lightBlue'], lowest)
+            else:
+                # Display error message if weather API failed
+                graphics.DrawText(canvas, self.fontSmall, 42, 30, self.color['error'], "W-ERR")
+            
+            # Display prayer information if available
+            if prayer and next_prayer_time:
+                graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['grey'], str(prayer))
+                graphics.DrawText(canvas, self.fontSmall, 5, 31, self.color['darkBlue'], str(next_prayer_time))
+            else:
+                # Display error message if prayer API failed
+                graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['error'], "P-ERR")
+            
+            # Update display
+            canvas = self.matrix.SwapOnVSync(canvas)
+            time.sleep(0.1)
+    
+    def display_gif(self, canvas, gif_name):
+        """Display an animated GIF"""
+        gif_path = os.path.join(GIF_DIR, f"{gif_name}.gif")
+        
+        if not os.path.exists(gif_path):
+            logger.error(f"GIF file not found: {gif_path}")
+            self.display_hmarquee(canvas, f"GIF {gif_name} not found")
+            return
+        
+        # Load the GIF
+        self.image = Image.open(gif_path)
+        frame_count = getattr(self.image, "n_frames", 0)
+        
+        if frame_count == 0:
+            logger.error(f"Not a valid animated GIF: {gif_path}")
+            self.display_hmarquee(canvas, f"Invalid GIF: {gif_name}")
+            return
+        
+        logger.info(f"Playing GIF {gif_name} with {frame_count} frames")
+        
+        while True:
+            # Get current time for clock display
+            _, _, _, clock = get_date_time()
+            
+            # Display each frame of the GIF
+            for frame in range(frame_count):
                 canvas.Clear()
                 
-                # Get current time
-                day, dt, mo, clk = get_date_time()
+                self.image.seek(frame)
+                frame_image = self.image.convert('RGB')
+                canvas.SetImage(frame_image, 0, 0, False)
                 
-                # Display weather icon if available
-                if hasattr(self, 'image') and self.image:
-                    canvas.SetImage(self.image, 44, -4, False)
+                # Display time centered on the GIF
+                text_width = len(clock) * 8  # Approximate width per character
+                x_pos = (canvas.width - text_width) // 2
+                y_pos = canvas.height // 2  # Center vertically
                 
-                # Display calendar
-                graphics.DrawText(canvas, self.fontSmall, 3, 6, self.color['lime'], day)
-                graphics.DrawText(canvas, self.fontSmall, 20, 6, self.color['lime'], dt)
-                graphics.DrawText(canvas, self.fontSmall, 30, 6, self.color['yellow'], mo)
+                graphics.DrawText(canvas, self.font, x_pos, y_pos, self.color['white'], clock)
                 
-                # Display clock
-                graphics.DrawText(canvas, self.font, 3, 18, self.color['white'], clk)
-                
-                # Display weather information if available
-                if current and highest and lowest:
-                    graphics.DrawText(canvas, self.font, 42, 30, self.color['skyBlue'], current)
-                    graphics.DrawText(canvas, self.fontSmall, 28, 25, self.color['pink'], highest)
-                    graphics.DrawText(canvas, self.fontSmall, 28, 31, self.color['lightBlue'], lowest)
-                else:
-                    # Display error message if weather API failed
-                    graphics.DrawText(canvas, self.fontSmall, 42, 30, self.color['error'], "W-ERR")
-                
-                # Display prayer information if available
-                if prayer and next_prayer_time:
-                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['grey'], str(prayer))
-                    graphics.DrawText(canvas, self.fontSmall, 5, 31, self.color['darkBlue'], str(next_prayer_time))
-                else:
-                    # Display error message if prayer API failed
-                    graphics.DrawText(canvas, self.fontSmall, 5, 25, self.color['error'], "P-ERR")
-                
-                # Update display
                 canvas = self.matrix.SwapOnVSync(canvas)
-                time.sleep(0.1)  # Small sleep to prevent high CPU usage
-
-
-        except KeyboardInterrupt:
-             return
-        except Exception as e:
-             logger.error(f"Error in display_clock_weather: {e}")
-             return
- 
-    def display_gif(self, canvas, message):
-         try:
-             # Check if the specified GIF exists
-             if message in GIFS and os.path.exists(GIFS[message]):
-                 # Load the GIF
-                 self.image = Image.open(GIFS[message])
-                 frame_count = getattr(self.image, "n_frames", 0)
-                 
-                 if frame_count == 0:
-                     logger.error(f"Not a valid animated GIF: {GIFS[message]}")
-                     self.display_hmarquee(canvas, f"Invalid GIF: {message}")
-                     return
-                 
-                 logger.info(f"Playing GIF {message} with {frame_count} frames")
-                 
-                 while True:
-                     # Get current time for clock display
-                     day, dt, mo, clk = get_date_time()
-                     
-                     # Choose text color based on GIF
-                     clr = self.color['black'] if message == 'fireplace' else self.color['white']
-                     
-                     # Display each frame of the GIF
-                     for frame in range(frame_count):
-                         canvas.Clear()
-                         try:
-                             self.image.seek(frame)
-                             frame_image = self.image.convert('RGB')
-                             canvas.SetImage(frame_image, 0, 0, False)
-                             
-                             # Calculate text width to center it
-                             # This is an estimation since we don't have direct text width measurement
-                             text_width = len(clk) * 8  # Approximate width per character
-                             x_pos = (canvas.width - text_width) // 2
-                             y_pos = canvas.height // 2  # Center vertically
-                             
-                             # Display time centered on the GIF
-                             graphics.DrawText(canvas, self.font, x_pos, y_pos, clr, clk)
-                             
-                             canvas = self.matrix.SwapOnVSync(canvas)
-                             
-                             # Control frame rate (adjust as needed for smooth playback)
-                             time.sleep(0.1)
-                         except Exception as e:
-                             logger.error(f"Error displaying frame {frame}: {e}")
-                             continue
-             else:
-                 logger.error(f"GIF file not found at {GIFS.get(message, 'unknown')}")
-                 self.display_hmarquee(canvas, f"GIF {message} not found")
-         except KeyboardInterrupt:
-             canvas.Clear()
-             return
-         except Exception as e:
-             logger.error(f"Error in display_gif: {e}")
-             return
- 
+                time.sleep(0.1)
+    
     def display_hmarquee(self, canvas, message):
-         try:
-             pos = canvas.width
-             length = 0
-             
-             # Continuously scroll the text until it's off-screen
-             while True:
-                 canvas.Clear()
-                 length = graphics.DrawText(canvas, self.font, pos, 20,
-                                    self.color['white'], message)
-                 pos -= 1
-                 
-                 # If the text has completely scrolled off the left side, restart
-                 if pos + length < 0:
-                     pos = canvas.width
-                 
-                 time.sleep(0.02)
-                 canvas = self.matrix.SwapOnVSync(canvas)
-         except KeyboardInterrupt:
-             return
-         except Exception as e:
-             logger.error(f"Error in display_hmarquee: {e}")
-             return
- 
+        """Display scrolling text"""
+        pos = canvas.width
+        length = 0
+        
+        # Continuously scroll the text
+        while True:
+            canvas.Clear()
+            length = graphics.DrawText(canvas, self.font, pos, 20,
+                                self.color['white'], message)
+            pos -= 1
+            
+            # If the text has completely scrolled off the left side, restart
+            if pos + length < 0:
+                pos = canvas.width
+            
+            time.sleep(0.02)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
 #############################################
 #              Main Function                #
 #############################################
 if __name__ == "__main__":
-     try:
-         # Make sure required directories exist before starting
-         setup_directories()
-         
-         # Start InfoCube
-         info_cube = InfoCube()
-         if not info_cube.process():
-             info_cube.print_help()
-     except KeyboardInterrupt:
-         logger.info("Program interrupted by user")
-         sys.exit(0)
-     except Exception as e:
-         logger.error(f"An error occurred: {e}")
-         sys.exit(1)
+    # Parse command line arguments - simplified to just the essentials
+    parser = argparse.ArgumentParser(description="RGB LED Matrix Display for Raspberry Pi")
+    parser.add_argument("--display-mode", help="Display mode: clock, prayer, gif, intro", default="clock")
+    parser.add_argument("--gif-name", help="GIF to display (if display-mode is 'gif')", default="matrix")
+    args = parser.parse_args()
+    
+    # Check directories
+    check_directories()
+    
+    # Verify we're running as root (required for GPIO access)
+    if os.geteuid() != 0:
+        logger.error("This program must be run as root (sudo) for GPIO access")
+        sys.exit(1)
+    
+    try:
+        # Start InfoCube
+        logger.info(f"Starting InfoCube with mode: {args.display_mode}")
+        info_cube = InfoCube(display_mode=args.display_mode, gif_name=args.gif_name)
+        info_cube.run()
+    except KeyboardInterrupt:
+        logger.info("Program interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        sys.exit(1)

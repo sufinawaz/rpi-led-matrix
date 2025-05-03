@@ -159,7 +159,19 @@ def load_image(image_path, size=None):
         return None
 
     try:
-        image = Image.open(image_path).convert('RGB')
+        # Open with transparency preserved, then explicitly convert to RGB with background 
+        if image_path.lower().endswith(('.png', '.gif')):
+            # For image formats that might have transparency
+            image = Image.open(image_path).convert('RGBA')
+            
+            # Create a white background image
+            background = Image.new('RGBA', image.size, (0, 0, 0, 255))
+            
+            # Paste the image on the background, using alpha as mask
+            image = Image.alpha_composite(background, image).convert('RGB')
+        else:
+            # For image formats without transparency (like JPG)
+            image = Image.open(image_path).convert('RGB')
         
         if size:
             # Use LANCZOS for best quality resizing
@@ -268,6 +280,7 @@ class InfoCube:
             self.image = mosque_image
         
         last_update_time = time.perf_counter()
+        force_update = False
         
         while True:
             now = time.perf_counter()
@@ -275,13 +288,22 @@ class InfoCube:
             
             # Check if we need to refresh prayer times based on next prayer time
             if next_prayer_time and current_time >= next_prayer_time:
+                logger.info("Prayer time reached, updating to get next prayer")
+                force_update = True
+            
+            # Update prayer times every 4 hours to ensure data is fresh
+            # or if the next prayer time has passed or API previously failed
+            if now - last_update_time > 14400 or force_update:
+                logger.info("Fetching fresh prayer times data")
                 times = get_prayer_times()
                 if times:
                     next_prayer_time, next_prayer_name = get_next_prayer_time(times)
-                    last_update_time = now
+                last_update_time = now
+                force_update = False
             
             # If API failed, retry every minute
             if not times and now - last_update_time > 60:
+                logger.info("Previous API call failed, retrying")
                 times = get_prayer_times()
                 if times:
                     next_prayer_time, next_prayer_name = get_next_prayer_time(times)
@@ -325,6 +347,8 @@ class InfoCube:
             self.image = DEFAULT_WEATHER_ICON
         
         last_weather_update = time.perf_counter()
+        last_prayer_update = time.perf_counter()
+        force_prayer_update = False
         
         while True:
             now = time.perf_counter()
@@ -332,6 +356,7 @@ class InfoCube:
             
             # Update weather data every 1 hour
             if now - last_weather_update > WEATHER_UPDATE_INTERVAL:
+                logger.info("Updating weather data (hourly update)")
                 c, l, h, i = get_openweather_data()
                 if c and l and h and i:
                     current, lowest, highest, icon_path = c, l, h, i
@@ -340,11 +365,19 @@ class InfoCube:
                         self.image = weather_image
                 last_weather_update = now
             
-            # Check if we need to refresh prayer times
+            # Check if we need to refresh prayer times based on time passing
             if next_prayer_time and current_time >= next_prayer_time:
+                logger.info("Prayer time reached, updating to get next prayer")
+                force_prayer_update = True
+            
+            # Update prayer times every 4 hours to ensure data is fresh
+            if now - last_prayer_update > 14400 or force_prayer_update:
+                logger.info("Updating prayer times")
                 times = get_prayer_times()
                 if times:
                     next_prayer_time, prayer = get_next_prayer_time(times)
+                last_prayer_update = now
+                force_prayer_update = False
             
             # Clear canvas for new frame
             canvas.Clear()

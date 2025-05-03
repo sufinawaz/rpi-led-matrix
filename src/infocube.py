@@ -240,6 +240,11 @@ class InfoCube:
         try:
             logger.info(f"Starting with display mode: {self.display_mode}")
             
+            # Always display the WM logo for 2 seconds at startup
+            logger.info("Displaying WM logo for 2 seconds")
+            self.display_startup_logo(canvas)
+            
+            # Then proceed with the selected display mode
             if self.display_mode == "clock":
                 self.display_clock_weather(canvas)
             elif self.display_mode == "prayer":
@@ -256,17 +261,21 @@ class InfoCube:
             self.matrix.SwapOnVSync(canvas)
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
-    
-    def display_wm_logo(self, canvas):
-        """Display the Wood Mistry logo"""
+
+    def display_startup_logo(self, canvas):
+        """Display the Wood Mistry logo for startup"""
         canvas.Clear()
         image = load_image(WOOD_MISTRY_LOGO)
         if image:
             canvas.SetImage(image, 0, 0, False)
             canvas = self.matrix.SwapOnVSync(canvas)
-            time.sleep(5)  # Show for 5 seconds
+            time.sleep(2)  # Show for exactly 2 seconds
         else:
-            self.display_hmarquee(canvas, "InfoCube")
+            # If logo not found, show a text message instead
+            canvas.Clear()
+            graphics.DrawText(canvas, self.font, 5, 20, self.color['white'], "InfoCube")
+            canvas = self.matrix.SwapOnVSync(canvas)
+            time.sleep(2)  # Show for exactly 2 seconds
     
     def display_prayer_times(self, canvas):
         """Display prayer times"""

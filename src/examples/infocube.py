@@ -163,6 +163,7 @@ def get_openweather_data():
         
         # Handle the icon
         icon_code = j['weather'][0]['icon']
+        logger.error(f"Icon Path: {WEATHER_ICONS_DIR} {icon_code}")
         
         # First ensure the directory exists to avoid permission errors
         if not os.path.exists(WEATHER_ICONS_DIR):

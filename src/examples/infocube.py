@@ -10,6 +10,7 @@ import os
 import argparse
 import requests
 import shutil
+from PIL import ImageDraw
 
 # Setup basic logging
 logging.basicConfig(
@@ -504,7 +505,6 @@ class InfoCube(SampleBase):
                 # If no weather icon is available, create a simple icon
                 logger.info("Creating a default weather icon")
                 try:
-                    from PIL import ImageDraw
                     # Create a blank icon
                     default_icon = Image.new('RGB', (24, 24), color=(0, 0, 0))
                     draw = ImageDraw.Draw(default_icon)

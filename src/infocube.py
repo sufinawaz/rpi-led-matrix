@@ -1004,3 +1004,109 @@ class InfoCube(SampleBase):
                 # Update display
                 canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(0.1)  # Small sleep to prevent high CPU usage
+
+
+        except KeyboardInterrupt:
+             return
+        except Exception as e:
+             logger.error(f"Error in display_clock_weather: {e}")
+             return
+ 
+    def display_gif(self, canvas, message):
+         try:
+             # Check if the specified GIF exists
+             if message in GIFS and os.path.exists(GIFS[message]):
+                 # Load the GIF
+                 self.image = Image.open(GIFS[message])
+                 frame_count = getattr(self.image, "n_frames", 0)
+                 
+                 if frame_count == 0:
+                     logger.error(f"Not a valid animated GIF: {GIFS[message]}")
+                     self.display_hmarquee(canvas, f"Invalid GIF: {message}")
+                     return
+                 
+                 logger.info(f"Playing GIF {message} with {frame_count} frames")
+                 
+                 while True:
+                     # Get current time for clock display
+                     day, dt, mo, clk = get_date_time()
+                     
+                     # Choose text color based on GIF
+                     clr = self.color['black'] if message == 'fireplace' else self.color['white']
+                     
+                     # Display each frame of the GIF
+                     for frame in range(frame_count):
+                         canvas.Clear()
+                         try:
+                             self.image.seek(frame)
+                             frame_image = self.image.convert('RGB')
+                             canvas.SetImage(frame_image, 0, 0, False)
+                             
+                             # Calculate text width to center it
+                             # This is an estimation since we don't have direct text width measurement
+                             text_width = len(clk) * 8  # Approximate width per character
+                             x_pos = (canvas.width - text_width) // 2
+                             y_pos = canvas.height // 2  # Center vertically
+                             
+                             # Display time centered on the GIF
+                             graphics.DrawText(canvas, self.font, x_pos, y_pos, clr, clk)
+                             
+                             canvas = self.matrix.SwapOnVSync(canvas)
+                             
+                             # Control frame rate (adjust as needed for smooth playback)
+                             time.sleep(0.1)
+                         except Exception as e:
+                             logger.error(f"Error displaying frame {frame}: {e}")
+                             continue
+             else:
+                 logger.error(f"GIF file not found at {GIFS.get(message, 'unknown')}")
+                 self.display_hmarquee(canvas, f"GIF {message} not found")
+         except KeyboardInterrupt:
+             canvas.Clear()
+             return
+         except Exception as e:
+             logger.error(f"Error in display_gif: {e}")
+             return
+ 
+    def display_hmarquee(self, canvas, message):
+         try:
+             pos = canvas.width
+             length = 0
+             
+             # Continuously scroll the text until it's off-screen
+             while True:
+                 canvas.Clear()
+                 length = graphics.DrawText(canvas, self.font, pos, 20,
+                                    self.color['white'], message)
+                 pos -= 1
+                 
+                 # If the text has completely scrolled off the left side, restart
+                 if pos + length < 0:
+                     pos = canvas.width
+                 
+                 time.sleep(0.02)
+                 canvas = self.matrix.SwapOnVSync(canvas)
+         except KeyboardInterrupt:
+             return
+         except Exception as e:
+             logger.error(f"Error in display_hmarquee: {e}")
+             return
+ 
+#############################################
+#              Main Function                #
+#############################################
+if __name__ == "__main__":
+     try:
+         # Make sure required directories exist before starting
+         setup_directories()
+         
+         # Start InfoCube
+         info_cube = InfoCube()
+         if not info_cube.process():
+             info_cube.print_help()
+     except KeyboardInterrupt:
+         logger.info("Program interrupted by user")
+         sys.exit(0)
+     except Exception as e:
+         logger.error(f"An error occurred: {e}")
+         sys.exit(1)

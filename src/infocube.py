@@ -128,7 +128,9 @@ def display_clock_weather(self, canvas):
             return
         except Exception as e:
             logger.error(f"Error in display_clock_weather: {e}", exc_info=True)
-            returndef get_openweather_data():
+            return 
+        
+def get_openweather_data():
     """Fetch weather data from OpenWeatherMap API"""
     start_time = time.perf_counter()
     logger.info('Fetching OpenWeatherMap data')

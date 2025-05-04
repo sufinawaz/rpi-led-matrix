@@ -16,7 +16,7 @@ class TextRenderer:
 
         # Try to find fonts directory from the rgb-matrix library
         # This assumes the library is installed and the fonts are available
-        font_path = "/usr/local/share/fonts"
+        font_path = "resources/fonts"
         self.default_font = self._load_font('7x13.bdf', font_path)
 
     def _load_font(self, font_name, font_dir):
@@ -39,7 +39,7 @@ class TextRenderer:
             # Fallback to searching in common system directories
             for directory in [
                 "/usr/share/fonts",
-                "/usr/local/share/fonts",
+                "resources/fonts",
                 os.path.expanduser("~/.local/share/fonts"),
                 # Add path to the rgb-matrix library fonts
                 os.path.join(os.path.dirname(__file__), "..", "..", "fonts")

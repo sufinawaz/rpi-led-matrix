@@ -7,6 +7,7 @@
     <title>InfoCube Remote Control</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        /* CSS styles (same as original) */
         :root {
             --primary: #4361ee;
             --primary-dark: #3a56d4;
@@ -37,12 +38,7 @@
             margin: 0 auto;
         }
 
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
+        h1, h2, h3, h4, h5, h6 {
             margin-bottom: 0.5rem;
             font-weight: 600;
             line-height: 1.2;
@@ -331,6 +327,59 @@
             font-weight: 600;
         }
 
+        .plugin-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .plugin-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .plugin-card.active {
+            border-color: var(--primary);
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+
+        .plugin-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .plugin-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            margin-right: 10px;
+        }
+
+        .plugin-text h4 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .plugin-text p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .plugin-actions {
+            display: flex;
+            gap: 8px;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 576px) {
             .btn-group {
@@ -343,6 +392,10 @@
 
             .gif-grid {
                 grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+
+            .plugin-actions {
+                flex-direction: column;
             }
         }
 
@@ -462,30 +515,47 @@
             </div>
         </div>
 
-        <!-- Display Modes Card -->
+        <!-- Display Plugins Card -->
         <div class="card">
             <div class="card-header">
-                <h3>Display Modes</h3>
+                <h3>Display Plugins</h3>
             </div>
             <div class="card-body">
-                <div class="btn-group">
-                    <a href="{{ url_for('set_mode', mode='clock') }}"
-                        class="btn btn-primary {% if current_mode == 'clock' %}active-mode{% endif %}">
-                        <i class="fas fa-clock"></i> Clock
-                    </a>
-                    <a href="{{ url_for('set_mode', mode='prayer') }}"
-                        class="btn btn-primary {% if current_mode == 'prayer' %}active-mode{% endif %}">
-                        <i class="fas fa-pray"></i> Prayer
-                    </a>
-                    <a href="{{ url_for('set_mode', mode='intro') }}"
-                        class="btn btn-primary {% if current_mode == 'intro' %}active-mode{% endif %}">
-                        <i class="fas fa-image"></i> Intro
-                    </a>
-                    <a href="{{ url_for('set_mode', mode='moon') }}"
-                        class="btn btn-primary {% if current_mode == 'moon' %}active-mode{% endif %}">
-                        <i class="fas fa-moon"></i> Moon
-                    </a>
+                {% for plugin in plugins %}
+                <div class="plugin-card {% if plugin.active %}active{% endif %}">
+                    <div class="plugin-info">
+                        <div class="plugin-icon">
+                            {% if plugin.name == 'clock' %}
+                            <i class="fas fa-clock"></i>
+                            {% elif plugin.name == 'prayer' %}
+                            <i class="fas fa-pray"></i>
+                            {% elif plugin.name == 'gif' %}
+                            <i class="fas fa-film"></i>
+                            {% elif plugin.name == 'intro' %}
+                            <i class="fas fa-image"></i>
+                            {% elif plugin.name == 'moon' %}
+                            <i class="fas fa-moon"></i>
+                            {% elif plugin.name == 'weather' %}
+                            <i class="fas fa-cloud-sun"></i>
+                            {% else %}
+                            <i class="fas fa-plug"></i>
+                            {% endif %}
+                        </div>
+                        <div class="plugin-text">
+                            <h4>{{ plugin.name|capitalize }}</h4>
+                            <p>{{ plugin.description }}</p>
+                        </div>
+                    </div>
+                    <div class="plugin-actions">
+                        <a href="{{ url_for('set_mode', mode=plugin.name) }}" class="btn btn-primary {% if plugin.active %}active-mode{% endif %}">
+                            <i class="fas fa-play"></i> Activate
+                        </a>
+                        <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}" class="btn btn-secondary">
+                            <i class="fas fa-cog"></i> Configure
+                        </a>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
 

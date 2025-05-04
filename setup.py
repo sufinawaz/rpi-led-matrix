@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import logging
 from pathlib import Path
+from setuptools import setup, find_packages
 
 # Set up logging
 logging.basicConfig(
@@ -372,6 +373,8 @@ def create_launcher_script(project_root):
         f.write("#!/bin/bash\n\n")
         f.write(f"PROJECT_ROOT=\"{project_root}\"\n")
         f.write("cd \"$PROJECT_ROOT\"\n\n")
+        f.write("# Add the project root to PYTHONPATH\n")
+        f.write("export PYTHONPATH=\"$PROJECT_ROOT:$PYTHONPATH\"\n\n")
         f.write("# Run infocube with default settings\n")
         f.write("sudo python3 \"$PROJECT_ROOT/src/infocube.py\" \"$@\"\n")
 
@@ -394,12 +397,102 @@ def create_launcher_script(project_root):
 
     return True
 
+def create_init_files(project_root):
+    """Create __init__.py files in all directories to make them proper packages"""
+    print_header("Creating Python package structure")
+
+    directories = [
+        os.path.join(project_root),
+        os.path.join(project_root, "src"),
+        os.path.join(project_root, "src", "animations"),
+        os.path.join(project_root, "src", "plugins"),
+        os.path.join(project_root, "src", "ui"),
+    ]
+
+    for directory in directories:
+        init_file = os.path.join(directory, "__init__.py")
+        if not os.path.exists(init_file):
+            with open(init_file, 'w') as f:
+                f.write("# Make directory a proper Python package\n")
+            logger.info(f"Created __init__.py in {directory}")
+
+    return True
+
+def update_import_paths(project_root):
+    """Add code to fix import paths in key files"""
+    print_header("Updating import paths in key files")
+
+    # Update src/infocube.py
+    infocube_path = os.path.join(project_root, "src", "infocube.py")
+    if os.path.exists(infocube_path):
+        with open(infocube_path, 'r') as f:
+            content = f.read()
+
+        # Check if import fix already exists
+        if "import sys" in content and not "sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))" in content:
+            # Add import fix
+            import_fix = """import os
+import sys
+# Add the parent directory to the path to make modules importable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+            # Find the shebang line
+            if content.startswith("#!/usr/bin/env python"):
+                # Add after the shebang line
+                content = content.replace("#!/usr/bin/env python\n", "#!/usr/bin/env python\n" + import_fix)
+            else:
+                # Add at the beginning
+                content = import_fix + content
+
+            with open(infocube_path, 'w') as f:
+                f.write(content)
+            logger.info(f"Updated import paths in {infocube_path}")
+
+    # Update other key files
+    key_files = [
+        os.path.join(project_root, "src", "display_manager.py"),
+        os.path.join(project_root, "remote_control.py"),
+    ]
+
+    for file_path in key_files:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                content = f.read()
+
+            # Check if import fix already exists
+            if "import sys" in content and not "sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))" in content:
+                # Add import fix
+                import_fix = """import os
+import sys
+# Add the parent directory to the path to make modules importable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+                # Find the shebang line
+                if content.startswith("#!/usr/bin/env python"):
+                    # Add after the shebang line
+                    content = content.replace("#!/usr/bin/env python\n", "#!/usr/bin/env python\n" + import_fix)
+                else:
+                    # Add at the beginning
+                    content = import_fix + content
+
+                with open(file_path, 'w') as f:
+                    f.write(content)
+                logger.info(f"Updated import paths in {file_path}")
+
+    return True
+
 def setup():
     """Main setup function"""
     print_header("LED Matrix InfoCube Setup")
 
     # Create project structure and get correct project root
     project_root = create_project_structure()
+
+    # Create Python package structure with __init__.py files
+    create_init_files(project_root)
+
+    # Update import paths in key files
+    update_import_paths(project_root)
 
     # Install system packages
     if not install_system_packages():
@@ -443,6 +536,30 @@ def setup():
     logger.info("or set the WEATHER_APP_ID environment variable before running.")
 
     return True
+
+# Setup for setuptools
+setup(
+    name="rgb-led-matrix-infocube",
+    version="0.1.0",
+    packages=find_packages(),
+    include_package_data=True,
+    description="RGB LED Matrix InfoCube for Raspberry Pi",
+    author="Sufi Nawaz",
+    author_email="your.email@example.com",
+    url="https://github.com/sufinawaz/rpi-led-matrix",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires=">=3.6",
+    install_requires=[
+        "requests",
+        "pillow",
+        "flask",
+        "werkzeug",
+    ],
+)
 
 if __name__ == "__main__":
     try:

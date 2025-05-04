@@ -9,6 +9,7 @@ import uuid
 from werkzeug.utils import secure_filename
 import shutil
 import re
+import json
 
 # Setup logging
 logging.basicConfig(
@@ -23,14 +24,50 @@ app.secret_key = os.urandom(24)  # For flash messages
 
 # Use the correct project root directory
 PROJECT_ROOT = "/home/pi/code/rpi-led-matrix"
+CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.json")
 GIF_DIR = os.path.join(PROJECT_ROOT, "resources", "images", "gifs")
-
-# Track current state
-current_mode = "clock"  # Default mode
-current_gif = ""
 
 # Make sure the directories exist
 os.makedirs(GIF_DIR, exist_ok=True)
+
+def load_config():
+    """Load configuration from file"""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            return {}
+    return {}
+
+def save_config(config):
+    """Save configuration to file"""
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=4)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving config: {e}")
+        return False
+
+def get_plugin_config(plugin_name):
+    """Get configuration for a specific plugin"""
+    config = load_config()
+    return config.get("plugins", {}).get("settings", {}).get(plugin_name, {})
+
+def update_plugin_config(plugin_name, plugin_config):
+    """Update configuration for a specific plugin"""
+    config = load_config()
+
+    if "plugins" not in config:
+        config["plugins"] = {}
+    if "settings" not in config["plugins"]:
+        config["plugins"]["settings"] = {}
+
+    config["plugins"]["settings"][plugin_name] = plugin_config
+
+    return save_config(config)
 
 def scan_gifs():
     """Get list of available GIFs"""
@@ -44,16 +81,18 @@ def scan_gifs():
 
 def change_display_mode(mode, gif_name=None):
     """Change the InfoCube display mode by restarting the service with new parameters"""
-    global current_mode, current_gif
-
-    # Get current environment variables from the service
-    weather_api_key = get_weather_api_key()
-
     # Build the ExecStart command
     exec_command = f"/usr/bin/python3 {PROJECT_ROOT}/src/infocube.py --display-mode={mode}"
     if mode == "gif" and gif_name:
         exec_command += f" --gif-name={gif_name}"
-        current_gif = gif_name
+
+        # Update gif plugin configuration
+        gif_config = get_plugin_config("gif")
+        gif_config["current_gif"] = gif_name
+        update_plugin_config("gif", gif_config)
+
+    # Get current environment variables from the service
+    weather_api_key = get_weather_api_key()
 
     # Modify the service file
     try:
@@ -85,7 +124,6 @@ WantedBy=multi-user.target
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
         subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
 
-        current_mode = mode
         logger.info(f"Display mode changed to: {mode}")
         return True
     except Exception as e:
@@ -102,6 +140,10 @@ def get_current_status():
             check=False
         )
         status = result.stdout.strip()
+
+        # Default values
+        current_mode = "unknown"
+        current_gif = ""
 
         # If service is running, get the command to see the current mode
         if status == "active":
@@ -120,6 +162,8 @@ def get_current_status():
                 current_mode = "prayer"
             elif "--display-mode=intro" in cmd_line:
                 current_mode = "intro"
+            elif "--display-mode=moon" in cmd_line:
+                current_mode = "moon"
             elif "--display-mode=gif" in cmd_line:
                 current_mode = "gif"
                 # Try to extract gif name
@@ -127,12 +171,12 @@ def get_current_status():
                     gif_part = cmd_line.split("--gif-name=")[1]
                     current_gif = gif_part.split(" ")[0]
 
-            return True, status
+            return True, status, current_mode, current_gif
         else:
-            return False, status
+            return False, status, current_mode, current_gif
     except Exception as e:
         logger.error(f"Error getting status: {e}")
-        return False, "unknown"
+        return False, "unknown", "unknown", ""
 
 def get_weather_api_key():
     """Get the current API key from the service"""
@@ -152,7 +196,9 @@ def get_weather_api_key():
                 if part.startswith("WEATHER_APP_ID="):
                     return part.split("=", 1)[1]
 
-        return ""
+        # Check config file if not found in service
+        config = load_config()
+        return config.get("api_keys", {}).get("openweathermap", "")
     except Exception as e:
         logger.error(f"Error getting API key: {e}")
         return ""
@@ -165,57 +211,45 @@ def get_masked_api_key():
         return "•" * (len(api_key) - 4) + api_key[-4:]
     return ""
 
-def download_gif(url, custom_name=None):
-    """Download a GIF from a URL and save it"""
-    try:
-        # Request the GIF
-        response = requests.get(url, stream=True)
-        if response.status_code != 200:
-            return False, f"Failed to download GIF: HTTP {response.status_code}"
+def get_plugins():
+    """Get list of installed plugins"""
+    config = load_config()
+    enabled_plugins = config.get("plugins", {}).get("enabled", [])
 
-        # Check if it's actually a GIF
-        content_type = response.headers.get('Content-Type', '')
-        if 'image/gif' not in content_type:
-            return False, f"URL does not point to a GIF image (Content-Type: {content_type})"
+    # Get the current active plugin
+    _, _, current_mode, _ = get_current_status()
 
-        # Generate a filename
-        if custom_name:
-            # Clean up the custom name
-            safe_name = re.sub(r'[^a-zA-Z0-9_-]', '', custom_name.lower().replace(' ', '_'))
-            if not safe_name:
-                safe_name = f"gif_{uuid.uuid4().hex[:8]}"
-        else:
-            # Extract filename from URL or generate random
-            url_filename = os.path.basename(url.split('?')[0])
-            if url_filename.endswith('.gif'):
-                safe_name = secure_filename(os.path.splitext(url_filename)[0])
-            else:
-                safe_name = f"gif_{uuid.uuid4().hex[:8]}"
+    plugins = []
+    for plugin in enabled_plugins:
+        plugin_info = {
+            "name": plugin,
+            "active": (plugin == current_mode),
+            "description": get_plugin_description(plugin),
+            "config": get_plugin_config(plugin)
+        }
+        plugins.append(plugin_info)
 
-        # Make sure we don't overwrite existing files
-        target_path = os.path.join(GIF_DIR, f"{safe_name}.gif")
-        counter = 1
-        while os.path.exists(target_path):
-            target_path = os.path.join(GIF_DIR, f"{safe_name}_{counter}.gif")
-            counter += 1
+    return plugins
 
-        # Save the file
-        with open(target_path, 'wb') as f:
-            shutil.copyfileobj(response.raw, f)
-
-        logger.info(f"Downloaded GIF to {target_path}")
-        return True, os.path.splitext(os.path.basename(target_path))[0]
-
-    except Exception as e:
-        logger.error(f"Error downloading GIF: {e}")
-        return False, str(e)
+def get_plugin_description(plugin_name):
+    """Get description for a plugin"""
+    descriptions = {
+        "clock": "Clock with date, weather, and prayer times",
+        "prayer": "Prayer times display",
+        "gif": "Animated GIF display",
+        "intro": "Introduction screen",
+        "moon": "Moon phase display",
+        "weather": "Detailed weather information"
+    }
+    return descriptions.get(plugin_name, "")
 
 @app.route('/')
 def index():
-    # Get the current status and mode
-    is_running, service_status = get_current_status()
+    # Get the current status, mode, and plugins
+    is_running, service_status, current_mode, current_gif = get_current_status()
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
+    plugins = get_plugins()
 
     return render_template(
         'index.html', 
@@ -224,12 +258,13 @@ def index():
         available_gifs=available_gifs,
         is_running=is_running,
         service_status=service_status,
-        masked_api_key=masked_api_key
+        masked_api_key=masked_api_key,
+        plugins=plugins
     )
 
 @app.route('/set_mode/<mode>')
 def set_mode(mode):
-    if mode in ['clock', 'prayer', 'intro', 'moon']:
+    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather']:
         change_display_mode(mode)
     return redirect(url_for('index'))
 
@@ -257,7 +292,7 @@ def update_api_key():
     api_key = request.form.get('weather_api_key', '')
 
     try:
-        # Get current service file content
+        # Update in environment variable
         with open('/etc/systemd/system/infocube-display.service', 'r') as f:
             service_content = f.read()
 
@@ -287,6 +322,13 @@ def update_api_key():
         # Replace the existing service file
         subprocess.run(["sudo", "cp", "/tmp/infocube-display.service", "/etc/systemd/system/infocube-display.service"], check=True)
 
+        # Update config file too
+        config = load_config()
+        if "api_keys" not in config:
+            config["api_keys"] = {}
+        config["api_keys"]["openweathermap"] = api_key
+        save_config(config)
+
         # Reload and restart
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
         subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
@@ -299,6 +341,42 @@ def update_api_key():
         flash(f"Error updating API key: {e}", "error")
         return redirect(url_for('index'))
 
+@app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
+def plugin_config(plugin_name):
+    """Get or update plugin configuration"""
+    if request.method == 'POST':
+        # Update configuration
+        plugin_config = request.form.to_dict()
+
+        # Convert boolean and numeric values
+        for key, value in plugin_config.items():
+            if value.lower() in ['true', 'yes', 'on', '1']:
+                plugin_config[key] = True
+            elif value.lower() in ['false', 'no', 'off', '0']:
+                plugin_config[key] = False
+            elif value.isdigit():
+                plugin_config[key] = int(value)
+            elif value.replace('.', '', 1).isdigit() and value.count('.') <= 1:
+                plugin_config[key] = float(value)
+
+        # Update configuration
+        update_plugin_config(plugin_name, plugin_config)
+
+        # Restart service to apply changes
+        subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+        flash(f"Configuration for {plugin_name} updated successfully", "success")
+        return redirect(url_for('index'))
+    else:
+        # Get configuration
+        plugin_config = get_plugin_config(plugin_name)
+        return render_template(
+            'plugin_config.html',
+            plugin_name=plugin_name,
+            plugin_config=plugin_config,
+            description=get_plugin_description(plugin_name)
+        )
+
 @app.route('/add_gif', methods=['POST'])
 def add_gif():
     """Add a new GIF from URL"""
@@ -309,16 +387,58 @@ def add_gif():
         flash("Please provide a GIF URL", "error")
         return redirect(url_for('index'))
 
-    success, result = download_gif(gif_url, custom_name)
+    try:
+        # Request the GIF
+        response = requests.get(gif_url, stream=True)
+        if response.status_code != 200:
+            flash(f"Failed to download GIF: HTTP {response.status_code}", "error")
+            return redirect(url_for('index'))
 
-    if success:
-        flash(f"GIF '{result}' added successfully", "success")
+        # Check if it's actually a GIF
+        content_type = response.headers.get('Content-Type', '')
+        if 'image/gif' not in content_type:
+            flash(f"URL does not point to a GIF image (Content-Type: {content_type})", "error")
+            return redirect(url_for('index'))
+
+        # Generate a filename
+        if custom_name:
+            # Clean up the custom name
+            safe_name = re.sub(r'[^a-zA-Z0-9_-]', '', custom_name.lower().replace(' ', '_'))
+            if not safe_name:
+                safe_name = f"gif_{uuid.uuid4().hex[:8]}"
+        else:
+            # Extract filename from URL or generate random
+            url_filename = os.path.basename(gif_url.split('?')[0])
+            if url_filename.endswith('.gif'):
+                safe_name = secure_filename(os.path.splitext(url_filename)[0])
+            else:
+                safe_name = f"gif_{uuid.uuid4().hex[:8]}"
+
+        # Make sure we don't overwrite existing files
+        target_path = os.path.join(GIF_DIR, f"{safe_name}.gif")
+        counter = 1
+        while os.path.exists(target_path):
+            target_path = os.path.join(GIF_DIR, f"{safe_name}_{counter}.gif")
+            counter += 1
+
+        # Save the file
+        with open(target_path, 'wb') as f:
+            shutil.copyfileobj(response.raw, f)
+
+        logger.info(f"Downloaded GIF to {target_path}")
+
+        # Get the final gif name
+        gif_name = os.path.splitext(os.path.basename(target_path))[0]
+        flash(f"GIF '{gif_name}' added successfully", "success")
+
         # Auto-select the new GIF
-        change_display_mode('gif', result)
-    else:
-        flash(f"Error adding GIF: {result}", "error")
+        change_display_mode('gif', gif_name)
 
-    return redirect(url_for('index'))
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error downloading GIF: {e}")
+        flash(f"Error adding GIF: {e}", "error")
+        return redirect(url_for('index'))
 
 @app.route('/upload_gif', methods=['POST'])
 def upload_gif():
@@ -384,6 +504,7 @@ def delete_gif(gif_name):
             logger.info(f"Deleted GIF: {gif_path}")
 
             # If we're currently displaying this GIF, switch to clock mode
+            _, _, current_mode, current_gif = get_current_status()
             if current_mode == 'gif' and current_gif == gif_name:
                 change_display_mode('clock')
                 flash(f"GIF '{gif_name}' deleted and display mode changed to clock", "success")
@@ -396,6 +517,32 @@ def delete_gif(gif_name):
         flash(f"Error deleting GIF: {e}", "error")
 
     return redirect(url_for('index'))
+
+@app.route('/api/plugins')
+def api_list_plugins():
+    """API endpoint to list plugins"""
+    plugins = get_plugins()
+    return jsonify(plugins)
+
+@app.route('/api/status')
+def api_status():
+    """API endpoint to get system status"""
+    is_running, service_status, current_mode, current_gif = get_current_status()
+
+    status = {
+        "running": is_running,
+        "service_status": service_status,
+        "current_mode": current_mode,
+        "current_gif": current_gif if current_mode == "gif" else None
+    }
+
+    return jsonify(status)
+
+@app.route('/api/gifs')
+def api_list_gifs():
+    """API endpoint to list available GIFs"""
+    gifs = scan_gifs()
+    return jsonify(gifs)
 
 if __name__ == '__main__':
     # Start the web server

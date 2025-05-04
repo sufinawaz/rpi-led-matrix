@@ -1,13 +1,12 @@
-# Raspberry Pi RGB LED Matrix Control
+# Raspberry Pi RGB LED Matrix InfoCube
 
-This project provides a Python framework for controlling RGB LED matrices with a Raspberry Pi using the excellent [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) library.
+This project provides a Python framework for controlling RGB LED matrices with a Raspberry Pi using the [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) library.
 
 ## Features
 
 - Simple interface for controlling RGB matrices
 - Text rendering with multiple fonts
-- Scrolling text animation
-- Clock display
+- Clock display with weather and prayer times
 - Image and GIF display
 - API integration (Weather and Prayer Times)
 - Animation framework for creating custom animations
@@ -26,157 +25,254 @@ This project provides a Python framework for controlling RGB LED matrices with a
 - Python 3.6+
 - Required system packages and Python libraries (see Installation)
 
-## Installation
+## Installation and System Setup
 
-### 1. System Packages
-
-First, install the required system packages:
+### 1. Clone the Repository
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y python3-dev python3-pillow python3-pip libgraphicsmagick++-dev libwebp-dev git
+git clone https://github.com/sufinawaz/rpi-led-matrix.git
+cd rgb-led-matrix-infocube
 ```
 
-### 2. Install the RGB Matrix Library
+### 2. Run the Setup Script
 
-Clone and install the rgb-matrix library:
+The included `setup.py` script will handle most of the installation process automatically:
 
 ```bash
-# Clone the library
-git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
-cd rpi-rgb-led-matrix
-
-# Install
-make
-cd bindings/python
-make build
-sudo make install
+sudo python3 setup.py
 ```
 
-### 3. Python Dependencies
+The setup script performs the following actions:
+- Creates the project directory structure
+- Installs required system packages
+- Clones and installs the rpi-rgb-led-matrix library
+- Installs Python dependencies
+- Creates a configuration file
+- Creates a launcher script with proper permissions
+- Sets up a global command (`infocube`)
 
-Install required Python dependencies:
+### 3. System-Level Changes
+
+#### Environment Variables
+
+To use the weather display functionality, set up the OpenWeatherMap API key:
 
 ```bash
-sudo pip3 install requests configparser
+echo 'export WEATHER_APP_ID="your_api_key_here"' >> ~/.bashrc
+source ~/.bashrc
 ```
-
-### 4. System Configuration
 
 #### Preserve Environment Variables for sudo
 
-To ensure that environment variables like WEATHER_APP_ID are preserved when running with sudo:
+To ensure that environment variables are preserved when running with sudo:
 
 ```bash
 sudo visudo
 ```
 
-Add the following line to the sudoers file:
+Add the following line:
 
 ```
 Defaults env_keep += "WEATHER_APP_ID"
 ```
 
-Save and exit the editor.
+#### Permissions for GPIO Access
 
-#### Set up API Keys
+The RGB Matrix library requires root privileges to access GPIO. Running `setup.py` will handle this, but it's important to understand why `sudo` is needed.
 
-For the weather display to work, you'll need an OpenWeatherMap API key:
+#### Running as a Service
 
-1. Register at [OpenWeatherMap](https://openweathermap.org/api) to get an API key
-2. Add your API key to your environment by adding this line to your `~/.bashrc` file:
+To run the InfoCube as a system service that starts on boot:
 
-```bash
-export WEATHER_APP_ID="your_api_key_here"
-```
-
-Then reload your .bashrc file:
+1. Create a systemd service file:
 
 ```bash
-source ~/.bashrc
+sudo nano /etc/systemd/system/infocube.service
 ```
 
-Alternatively, you can create a config.ini file in the same directory as the script:
+2. Add the following content:
+
+```
+[Unit]
+Description=RGB LED Matrix InfoCube
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment="WEATHER_APP_ID=your_api_key_here"
+ExecStart=/usr/local/bin/infocube --display-mode=clock
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable infocube.service
+sudo systemctl start infocube.service
+```
+
+## Configuration
+
+### Config File
+
+The main configuration file is located at `config.ini` in the project root. Edit this file to customize your setup:
 
 ```ini
+[MATRIX]
+rows = 32
+cols = 32
+chain_length = 1
+brightness = 70
+hardware_mapping = adafruit-hat
+gpio_slowdown = 2
+
 [API]
-WEATHER_APP_ID = your_api_key_here
+WEATHER_APP_ID = YOUR_API_KEY_HERE
 ```
 
-#### Directory Structure
+## Running the Application
 
-Create the necessary directories for images and other resources:
+### Manual Execution
+
+After running the setup script, you can start the application using:
 
 ```bash
-# Create the base directory structure
-mkdir -p ~/led/images/gifs
-mkdir -p ~/led/images/weather-icons
+sudo infocube
 ```
 
-### 5. Running the InfoCube
-
-The standard command to run the InfoCube is:
+Or with specific options:
 
 ```bash
-sudo python3 infocube.py
+sudo infocube --display-mode=clock --gif-name=matrix
 ```
 
-You can use these default settings for a 32x64 matrix with an Adafruit HAT:
-
-```bash
-sudo python3 infocube.py --led-rows=32 --led-cols=64 --led-gpio-mapping=adafruit-hat --led-rgb-sequence=rbg --led-brightness=40 --led-no-drop-privs --led-slowdown-gpio=2 --led-pwm-bits=8 --led-scan-mode=0
-```
-
-#### Display Modes
+### Display Modes
 
 The InfoCube supports various display modes:
 
 - `--display-mode=clock`: Shows time, date, weather, and prayer times
 - `--display-mode=prayer`: Shows prayer times
-- `--display-mode=gif`: Displays an animated GIF
+- `--display-mode=gif`: Displays an animated GIF (use with `--gif-name=name_of_gif`)
 - `--display-mode=intro`: Shows the intro logo
 
-For GIF mode, specify a GIF name:
+## Debugging and Maintenance
+
+### Viewing Logs
+
+When running as a service, view logs with:
 
 ```bash
-sudo python3 infocube.py --display-mode=gif --gif-name=matrix
+sudo journalctl -u infocube.service -f
 ```
 
-## Troubleshooting
+For manual execution, logs are printed to the console.
 
-### Common Issues
+### Common Debugging Commands
 
-#### Permission Denied
+Check if the service is running:
 
-If you see permission errors:
-
-```
-Error accessing GPIO
+```bash
+sudo systemctl status infocube.service
 ```
 
-Make sure you are running the script with sudo or that the `--led-no-drop-privs` option is used.
+Restart the service:
 
-#### Missing Fonts
-
-If you see errors about missing fonts:
-
-```
-Error loading font
+```bash
+sudo systemctl restart infocube.service
 ```
 
-The fonts should be available in the rpi-rgb-led-matrix/fonts directory. Update your FONT_DIR path if necessary.
+Stop the service:
 
-#### Weather API Issues
+```bash
+sudo systemctl stop infocube.service
+```
 
-If weather information isn't displaying:
+Check for GPIO conflicts:
 
-1. Check that your WEATHER_APP_ID environment variable is set
-2. Ensure your internet connection is working
-3. Verify your API key is valid
+```bash
+gpio readall
+```
+
+Test the matrix directly using the rpi-rgb-led-matrix examples:
+
+```bash
+cd rpi-rgb-led-matrix/examples-api-use
+sudo ./demo -D 0 --led-rows=32 --led-cols=32 --led-gpio-mapping=adafruit-hat
+```
+
+### Troubleshooting GPIO Issues
+
+1. Ensure correct permissions and access:
+
+```bash
+sudo usermod -a -G gpio,spi,i2c pi
+```
+
+2. Check for GPIO pin usage conflicts:
+
+```bash
+sudo cat /sys/kernel/debug/gpio
+```
+
+3. Test basic GPIO functionality:
+
+```bash
+sudo apt-get install -y wiringpi
+gpio -g mode 17 out
+gpio -g write 17 1
+gpio -g write 17 0
+```
+
+### Hardware Diagnostics
+
+Run this diagnostic script to verify hardware connections:
+
+```bash
+wget -O - https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/rgb-matrix.sh | bash
+```
+
+Select the "Quality test" option to verify your matrix connections.
+
+### Upgrading and Maintenance
+
+To update the application:
+
+```bash
+cd rgb-led-matrix-infocube
+git pull
+sudo python3 setup.py
+sudo systemctl restart infocube.service
+```
+
+## Project Structure
+
+- `src/`: Source code
+  - `matrix_manager.py`: Core matrix control class
+  - `text_renderer.py`: Text display utilities
+  - `infocube.py`: Main application
+- `resources/`: Font and image files
+- `config.ini`: Configuration file
+- `setup.py`: Installation script
 
 ## Advanced Configuration
 
-For more advanced matrix configurations, refer to the [rpi-rgb-led-matrix documentation](https://github.com/hzeller/rpi-rgb-led-matrix#changing-parameters-via-command-line-flags).
+### Hardware Mapping
+
+If you're using a different GPIO mapping than the Adafruit HAT, update both:
+1. The `hardware_mapping` setting in `config.ini`
+2. The `--led-gpio-mapping` parameter in your service file
+
+### Display Chain Configuration
+
+For multiple panels chained together, update:
+1. The `chain_length` and `parallel` settings in `config.ini`
+2. Add corresponding command line arguments to your service file
 
 ## Contributing
 

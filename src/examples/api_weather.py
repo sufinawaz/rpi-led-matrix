@@ -20,11 +20,11 @@ CITY = "YOUR_CITY_HERE"
 def get_weather():
     """Fetch weather data from OpenWeatherMap API"""
     url = f"https://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={API_KEY}&units=metric"
-    
+
     try:
         response = requests.get(url)
         data = response.json()
-        
+
         if response.status_code == 200:
             # Extract relevant information
             weather = {
@@ -51,15 +51,15 @@ def main():
         brightness=50,
         hardware_mapping="adafruit-hat"
     )
-    
+
     # Create a text renderer
     text = TextRenderer(matrix)
-    
+
     try:
         while True:
             # Fetch weather data
             weather = get_weather()
-            
+
             if weather:
                 # Display city name
                 text.draw_centered_text(
@@ -67,14 +67,14 @@ def main():
                     color=(64, 224, 208)  # Turquoise
                 )
                 time.sleep(2)
-                
+
                 # Display temperature
                 text.draw_centered_text(
                     f"{weather['temp']:.1f}°C",
                     color=(255, 255, 0)  # Yellow
                 )
                 time.sleep(2)
-                
+
                 # Scroll weather description
                 scroll = ScrollText(
                     matrix,
@@ -82,7 +82,7 @@ def main():
                     color=(135, 206, 235),  # Sky blue
                     scroll_speed=15
                 )
-                
+
                 # Run for 20 seconds then update weather
                 scroll.start(run_time=20)
             else:
@@ -92,7 +92,7 @@ def main():
                     color=(255, 0, 0)  # Red
                 )
                 time.sleep(5)
-                
+
     except KeyboardInterrupt:
         # Clear the display when done
         matrix.clear()

@@ -17,7 +17,7 @@ def main():
         brightness=50,
         hardware_mapping="adafruit-hat"
     )
-    
+
     # Create a clock animation
     clock = Clock(
         matrix,
@@ -25,7 +25,7 @@ def main():
         show_seconds=True,
         format_24h=True
     )
-    
+
     # Start the clock - will run until Ctrl+C is pressed
     clock.start()
 

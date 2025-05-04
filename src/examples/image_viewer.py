@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--fps', type=int, default=30,
                         help='Target frame rate for animations')
     args = parser.parse_args()
-    
+
     # Initialize the matrix
     matrix = MatrixManager(
         rows=32,
@@ -31,7 +31,7 @@ def main():
         brightness=70,
         hardware_mapping="adafruit-hat"
     )
-    
+
     # Create an image display animation
     image_display = ImageDisplay(
         matrix,
@@ -41,7 +41,7 @@ def main():
         fit=args.fit,
         fps=args.fps
     )
-    
+
     # Start the animation - will run until Ctrl+C is pressed
     # or until the end of a non-looping animation
     image_display.start()

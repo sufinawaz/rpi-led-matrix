@@ -266,17 +266,23 @@ class InfoCube:
 
     def display_moon_phase(self, canvas):
         """Display the current moon phase"""
+        # Import at the function level to avoid circular imports
         from animations.moon_phase import MoonPhase
-        
-        # Create a moon phase animation
-        moon = MoonPhase(
-            self.matrix,
-            color=(220, 220, 255),  # Slightly blue-white color for the moon
-            show_text=True
-        )
-        
-        # Start the animation
-        moon.start()
+
+        try:
+            # Create a moon phase animation
+            moon = MoonPhase(
+                self.matrix,
+                color=(220, 220, 255),  # Slightly blue-white color for the moon
+                show_text=True
+            )
+
+            # Start the animation
+            moon.start()
+        except Exception as e:
+            logger.error(f"Error displaying moon phase: {e}")
+            # Show an error message on the matrix
+            self.display_hmarquee(canvas, f"Moon Phase Error: {str(e)}")
 
     def display_startup_logo(self, canvas):
         """Display the Wood Mistry logo for startup"""

@@ -17,7 +17,7 @@ def main():
         brightness=50,
         hardware_mapping="adafruit-hat"
     )
-    
+
     # Create a scrolling text animation
     scroll = ScrollText(
         matrix,
@@ -25,7 +25,7 @@ def main():
         color=(255, 165, 0),  # Orange
         scroll_speed=20  # Pixels per second
     )
-    
+
     # Start the animation - will run until Ctrl+C is pressed
     scroll.start()
 

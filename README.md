@@ -185,3 +185,38 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+
+## Remote Control
+
+The InfoCube can be controlled remotely from your phone or any other device connected to the same WiFi network.
+
+### Features
+- View current display mode and status
+- Switch between clock, prayer times, and intro modes
+- Select and display GIFs
+- Restart the InfoCube display
+
+### Setup
+1. The remote control is automatically installed and configured during setup
+2. Access the remote control interface by navigating to:
+
+
+### How It Works
+- The system runs two services:
+- `infocube-display.service`: Controls the LED matrix display
+- `infocube-remote.service`: Provides the web interface
+- Changes made through the web interface update the display service
+- The display automatically starts in clock mode on boot
+
+### Troubleshooting
+If you encounter issues with the remote control:
+1. Check if both services are running:
+sudo systemctl status infocube-display.service
+sudo systemctl status infocube-remote.service
+2. Restart services if needed:
+sudo systemctl restart infocube-display.service
+sudo systemctl restart infocube-remote.service
+3. View logs for more information:
+sudo journalctl -u infocube-display.service -n 50
+sudo journalctl -u infocube-remote.service -n 50

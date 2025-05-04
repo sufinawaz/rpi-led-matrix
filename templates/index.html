@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>InfoCube Remote Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+        .status-active {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .status-inactive {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            flex-grow: 1;
+            flex-basis: 40%;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .active-mode {
+            background-color: #2196F3;
+            border: 2px solid #0b7dda;
+        }
+        .gif-selection {
+            margin-top: 20px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .restart-button {
+            background-color: #ff9800;
+            margin-top: 20px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>InfoCube Remote Control</h1>
+    
+    <div class="status {% if is_running %}status-active{% else %}status-inactive{% endif %}">
+        <p>Service Status: <strong>{{ service_status }}</strong></p>
+        <p>Current Mode: <strong>{{ current_mode }}</strong></p>
+        {% if current_mode == "gif" %}
+        <p>Current GIF: <strong>{{ current_gif }}</strong></p>
+        {% endif %}
+    </div>
+    
+    <div class="button-group">
+        <a href="{{ url_for('set_mode', mode='clock') }}" class="button {% if current_mode == 'clock' %}active-mode{% endif %}">Clock Mode</a>
+        <a href="{{ url_for('set_mode', mode='prayer') }}" class="button {% if current_mode == 'prayer' %}active-mode{% endif %}">Prayer Times</a>
+        <a href="{{ url_for('set_mode', mode='intro') }}" class="button {% if current_mode == 'intro' %}active-mode{% endif %}">Intro Logo</a>
+    </div>
+    
+    <div class="gif-selection">
+        <h3>GIF Display Mode</h3>
+        <form action="{{ url_for('set_gif') }}" method="post">
+            <select name="gif_name" id="gif_name">
+                {% for gif in available_gifs %}
+                <option value="{{ gif }}" {% if current_mode == 'gif' and current_gif == gif %}selected{% endif %}>{{ gif }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="button" style="width: 100%;">Show GIF</button>
+        </form>
+    </div>
+    
+    <a href="{{ url_for('restart_service') }}" class="button restart-button">Restart InfoCube</a>
+<div class="section">
+    <h3>Settings</h3>
+    <form action="{{ url_for('update_api_key') }}" method="post">
+        <div style="margin-bottom: 10px;">
+            <label for="weather_api_key">OpenWeatherMap API Key:</label>
+            <input type="text" id="weather_api_key" name="weather_api_key" 
+                   value="{{ weather_api_key }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
+        </div>
+        <button type="submit" class="button" style="width: 100%;">Update API Key</button>
+    </form>
+</div>
+</body>
+</html>

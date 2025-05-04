@@ -271,23 +271,13 @@ class InfoCube:
         """Display the current moon phase"""
         logger.info("Starting moon phase display")
 
-        # Create a MatrixManager instance to work with the animations
-        matrix_manager = MatrixManager(
-            rows=self.matrix.height,
-            cols=self.matrix.width,
-            chain_length=1,
-            brightness=self.options.brightness,
-            hardware_mapping=self.options.hardware_mapping,
-            gpio_slowdown=self.options.gpio_slowdown
-        )
-
         # Update interval in seconds
         update_interval = 3600  # Update every hour
         last_update = 0
 
         try:
             # Initial moon phase
-            moon_size = (matrix_manager.width // 2, matrix_manager.width // 2)
+            moon_size = (self.matrix.width // 2, self.matrix.width // 2)
             phase_name, moon_image = get_moon_phase_image(
                 size=moon_size,
                 color=(220, 220, 255),  # Slightly blue-white color for the moon
@@ -312,18 +302,18 @@ class InfoCube:
                     logger.info(f"Current moon phase: {phase_name}")
                     last_update = current_time
 
-                # Create a new image for the canvas
-                display_image = Image.new("RBG", (self.matrix.width, self.matrix.height), (0, 0, 0))
+                # Clear the canvas
+                canvas.Clear()
 
-                # Calculate position to place the moon image (centered)
+                # Display the moon image
                 if moon_image:
                     moon_pos_x = (self.matrix.width - moon_image.width) // 2
                     moon_pos_y = 2  # Position near the top to leave room for text
 
-                    # Paste the moon image
-                    display_image.paste(moon_image, (moon_pos_x, moon_pos_y))
+                    # Set the moon image on the canvas
+                    canvas.SetImage(moon_image, moon_pos_x, moon_pos_y)
 
-                    # Optional: Add phase name text at the bottom
+                    # Get current date for display
                     day, date, month, _ = get_date_time()
 
                     # Display date
@@ -341,8 +331,7 @@ class InfoCube:
                     graphics.DrawText(canvas, self.fontSmall, 3, self.matrix.height - 14, 
                                     self.color['white'], phase_text)
 
-                # Display the image
-                canvas.SetImage(display_image, 0, 0)
+                # Update the display
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 # Sleep to maintain a reasonable frame rate

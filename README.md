@@ -316,3 +316,130 @@ sudo systemctl restart infocube-remote.service
 3. View logs for more information:
 sudo journalctl -u infocube-display.service -n 50
 sudo journalctl -u infocube-remote.service -n 50
+
+
+# Remote Control for InfoCube
+
+The InfoCube includes a modern web-based remote control interface, allowing you to manage your display from any device connected to the same network.
+
+## Features
+
+- Change between all display modes (clock, prayer times, intro, GIF)
+- Modern, responsive mobile-friendly interface
+- Upload new GIFs directly from your device
+- Add GIFs from any URL on the internet
+- Rename and delete GIFs
+- Secure API key management
+- Real-time display status monitoring
+- Simple one-click activation of display modes
+
+## Setup
+
+The remote control is automatically set up during installation. No additional configuration is required.
+
+### Access the Remote Control
+
+1. Find your Raspberry Pi's IP address:
+   ```bash
+   hostname -I
+   ```
+
+2. Access the web interface from any device on the same network by navigating to:
+   ```
+   http://YOUR_PI_IP:8080
+   ```
+
+### Static IP Configuration (Recommended)
+
+For easier access, configure your Raspberry Pi with a static IP:
+
+1. Edit the dhcpcd.conf file:
+   ```bash
+   sudo nano /etc/dhcpcd.conf
+   ```
+
+2. Add these lines (adjust for your network):
+   ```
+   interface wlan0
+   static ip_address=192.168.1.100/24
+   static routers=192.168.1.1
+   static domain_name_servers=192.168.1.1 8.8.8.8
+   ```
+
+3. Reboot the Pi:
+   ```bash
+   sudo reboot
+   ```
+
+## Using the Remote Control
+
+### Display Modes
+
+Click on any of the display mode buttons to immediately change the InfoCube's display:
+- **Clock**: Shows time, date, weather, and next prayer time
+- **Prayer**: Displays all prayer times
+- **Intro**: Shows the intro logo
+
+### GIF Management
+
+The GIFs tab provides three options:
+1. **Gallery**: View and activate existing GIFs
+2. **Add from URL**: Download a GIF from any URL
+3. **Upload**: Upload GIFs directly from your device
+
+### Settings
+
+- **API Key**: Securely manage your OpenWeatherMap API key
+- **Restart**: Restart the InfoCube display if needed
+
+## Services Management
+
+The remote control uses two systemd services:
+
+1. **infocube-display.service**: Controls the LED matrix display
+2. **infocube-remote.service**: Provides the web interface
+
+### Service Commands
+
+Check status:
+```bash
+sudo systemctl status infocube-display.service
+sudo systemctl status infocube-remote.service
+```
+
+Restart services:
+```bash
+sudo systemctl restart infocube-display.service
+sudo systemctl restart infocube-remote.service
+```
+
+View logs:
+```bash
+sudo journalctl -u infocube-display.service -n 50
+sudo journalctl -u infocube-remote.service -n 50
+```
+
+## Troubleshooting
+
+If you encounter issues with the remote control:
+
+1. **Web interface not accessible**:
+   - Ensure the remote control service is running
+   - Check your network connection
+   - Verify you're using the correct IP address
+
+2. **Changes not applying to the display**:
+   - Check if the display service is running
+   - Restart both services
+
+3. **Cannot upload GIFs**:
+   - Check if the 'resources/images/gifs' directory exists and has proper permissions
+   - Ensure there's enough disk space
+
+4. **Weather data not showing**:
+   - Verify your API key is correctly set
+   - Check internet connectivity
+
+## Security Considerations
+
+The remote control interface is designed for use on trusted local networks only. It does not include authentication, so anyone on your network can control the InfoCube.

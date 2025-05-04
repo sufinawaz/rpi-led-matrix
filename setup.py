@@ -92,7 +92,8 @@ def create_project_structure():
         os.path.join(project_root, "resources", "images"),
         os.path.join(project_root, "resources", "images", "gifs"),
         os.path.join(project_root, "resources", "images", "weather-icons"),
-        os.path.join(project_root, "resources", "fonts")
+        os.path.join(project_root, "resources", "fonts"),
+        os.path.join(project_root, "templates")  # Added templates directory for remote control
     ]
     
     # Create directories
@@ -130,7 +131,8 @@ def install_system_packages():
             "python3-pillow",
             "python3-pip",
             "python3-requests",  # Add system package for requests
-            # configparser is built into Python 3, no need for separate package
+            "python3-flask",     # Add system package for Flask (remote control)
+            "python3-werkzeug",  # Add system package for Werkzeug (remote control)
             "libgraphicsmagick++-dev",
             "libwebp-dev",
             "git"
@@ -235,7 +237,9 @@ def install_python_dependencies():
         # Install using apt instead
         packages = [
             "python3-requests",
-            "python3-pillow"
+            "python3-pillow",
+            "python3-flask",  # Added for remote control
+            "python3-werkzeug"  # Added for remote control
             # configparser is built into Python 3, no need for separate package
         ]
         
@@ -245,7 +249,7 @@ def install_python_dependencies():
             return False
     else:
         # We can use pip directly
-        packages = ["requests", "pillow"]  # configparser is built into Python 3
+        packages = ["requests", "pillow", "flask", "werkzeug"]  # Added Flask and Werkzeug
         pip_command = [sys.executable, "-m", "pip", "install"] + packages
         
         if run_command(pip_command) != 0:
@@ -278,6 +282,84 @@ def create_config_file(project_root):
     else:
         logger.info(f"Config file already exists at {config_path}")
     
+    return True
+
+def create_services(project_root):
+    """Create systemd service files for InfoCube and remote control"""
+    print_header("Setting up systemd services")
+    
+    # Create the InfoCube display service
+    display_service_path = "/etc/systemd/system/infocube-display.service"
+    if not os.path.exists(display_service_path):
+        logger.info("Creating InfoCube display service")
+        
+        with open('/tmp/infocube-display.service', 'w') as f:
+            f.write(f"""[Unit]
+Description=InfoCube LED Matrix Display
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={project_root}
+ExecStart=/usr/bin/python3 {project_root}/src/infocube.py --display-mode=clock
+Environment="WEATHER_APP_ID=YOUR_API_KEY_HERE"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+""")
+        
+        if run_command(["sudo", "cp", "/tmp/infocube-display.service", display_service_path]) != 0:
+            logger.error("Failed to create InfoCube display service")
+            return False
+    else:
+        logger.info("InfoCube display service already exists")
+    
+    # Create the remote control service
+    remote_service_path = "/etc/systemd/system/infocube-remote.service"
+    if not os.path.exists(remote_service_path):
+        logger.info("Creating InfoCube remote control service")
+        
+        with open('/tmp/infocube-remote.service', 'w') as f:
+            f.write(f"""[Unit]
+Description=InfoCube Remote Control Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={project_root}
+ExecStart=/usr/bin/python3 {project_root}/remote_control.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+""")
+        
+        if run_command(["sudo", "cp", "/tmp/infocube-remote.service", remote_service_path]) != 0:
+            logger.error("Failed to create InfoCube remote control service")
+            return False
+    else:
+        logger.info("InfoCube remote control service already exists")
+    
+    # Enable services to start at boot
+    logger.info("Enabling services to start at boot")
+    if run_command(["sudo", "systemctl", "daemon-reload"]) != 0:
+        logger.error("Failed to reload systemd configuration")
+        return False
+    
+    if run_command(["sudo", "systemctl", "enable", "infocube-display.service"]) != 0:
+        logger.error("Failed to enable InfoCube display service")
+        return False
+    
+    if run_command(["sudo", "systemctl", "enable", "infocube-remote.service"]) != 0:
+        logger.error("Failed to enable InfoCube remote control service")
+        return False
+    
+    logger.info("Services configured successfully")
     return True
 
 def create_launcher_script(project_root):
@@ -333,9 +415,15 @@ def setup():
         logger.warning("You may need to install the following packages manually:")
         logger.warning("  - requests (for API calls)")
         logger.warning("  - pillow (for image processing)")
+        logger.warning("  - flask (for remote control)")
+        logger.warning("  - werkzeug (for remote control)")
     
     # Create config file
     if not create_config_file(project_root):
+        return False
+    
+    # Create systemd services
+    if not create_services(project_root):
         return False
     
     # Create launcher script
@@ -349,6 +437,8 @@ def setup():
     logger.info("  sudo infocube")
     logger.info("\nOr with custom options:")
     logger.info("  sudo infocube --display-mode=clock --led-brightness=50")
+    logger.info("\nRemote Control:")
+    logger.info("  Access the web interface at http://YOUR_PI_IP:8080")
     logger.info("\nPlease configure your OpenWeatherMap API key in config.ini")
     logger.info("or set the WEATHER_APP_ID environment variable before running.")
     

@@ -1,120 +1,653 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InfoCube Remote Control</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --card-bg: #ffffff;
+            --card-border: #e9ecef;
+            --body-bg: #f5f7fb;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: var(--body-bg);
             padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
         }
-        h1 {
-            color: #333;
-            text-align: center;
+
+        h1, h2, h3, h4, h5, h6 {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            line-height: 1.2;
         }
-        .status {
-            text-align: center;
-            padding: 10px;
-            margin-bottom: 20px;
-            background-color: #f8f8f8;
-            border-radius: 5px;
-        }
-        .status-active {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-        }
-        .status-inactive {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-        }
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 5px;
-            flex-grow: 1;
-            flex-basis: 40%;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        .active-mode {
-            background-color: #2196F3;
-            border: 2px solid #0b7dda;
-        }
-        .gif-selection {
-            margin-top: 20px;
-        }
-        select {
+
+        .container {
             width: 100%;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            margin-bottom: 10px;
+            padding-right: 15px;
+            padding-left: 15px;
+            margin-right: auto;
+            margin-left: auto;
         }
-        .restart-button {
-            background-color: #ff9800;
+
+        .card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            word-wrap: break-word;
+            background-color: var(--card-bg);
+            background-clip: border-box;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background-color: #10b981;
+        }
+
+        .status-inactive {
+            background-color: #ef4444;
+        }
+
+        .btn {
+            display: inline-block;
+            font-weight: 500;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            user-select: none;
+            border: 1px solid transparent;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .btn-success {
+            color: #fff;
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+
+        .btn-warning {
+            color: #fff;
+            background-color: var(--warning);
+            border-color: var(--warning);
+        }
+
+        .btn-danger {
+            color: #fff;
+            background-color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .active-mode {
+            position: relative;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.5);
+        }
+
+        .active-mode::after {
+            content: "✓";
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: var(--primary);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #495057;
+            background-color: #fff;
+            background-clip: padding-box;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        }
+
+        label {
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .alert {
+            position: relative;
+            padding: 0.75rem 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid transparent;
+            border-radius: 8px;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .gif-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
             margin-top: 20px;
-            /* width: 100%; */
+        }
+
+        .gif-item {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            position: relative;
+            transition: all 0.2s ease;
+            border: 1px solid #e9ecef;
+        }
+
+        .gif-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .gif-item.active {
+            background-color: #e6f7ff;
+            border-color: #91caff;
+        }
+
+        .gif-name {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            word-break: break-word;
+        }
+
+        .gif-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .gif-action-btn {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .gif-placeholder {
+            width: 100%;
+            height: 80px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: #adb5bd;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .status-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #6c757d;
+        }
+
+        .status-value {
+            font-weight: 600;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 576px) {
+            .btn-group {
+                grid-template-columns: 1fr;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .gif-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+
+        /* Flash messages */
+        .flash-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .flash {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-out 3s forwards;
+            display: flex;
+            align-items: center;
+        }
+
+        .flash-success {
+            background-color: #d1fae5;
+            border-left: 4px solid #10b981;
+            color: #064e3b;
+        }
+
+        .flash-error {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #7f1d1d;
+        }
+
+        .flash-icon {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>InfoCube Remote Control</h1>
-    
-    <div class="status {% if is_running %}status-active{% else %}status-inactive{% endif %}">
-        <p>Service Status: <strong>{{ service_status }}</strong></p>
-        <p>Current Mode: <strong>{{ current_mode }}</strong></p>
-        {% if current_mode == "gif" %}
-        <p>Current GIF: <strong>{{ current_gif }}</strong></p>
-        {% endif %}
-    </div>
-    
-    <div class="button-group">
-        <a href="{{ url_for('set_mode', mode='clock') }}" class="button {% if current_mode == 'clock' %}active-mode{% endif %}">Clock Mode</a>
-        <a href="{{ url_for('set_mode', mode='prayer') }}" class="button {% if current_mode == 'prayer' %}active-mode{% endif %}">Prayer Times</a>
-        <a href="{{ url_for('set_mode', mode='intro') }}" class="button {% if current_mode == 'intro' %}active-mode{% endif %}">Intro Logo</a>
-    </div>
-    
-    <div class="gif-selection">
-        <h3>GIF Display Mode</h3>
-        <form action="{{ url_for('set_gif') }}" method="post">
-            <select name="gif_name" id="gif_name">
-                {% for gif in available_gifs %}
-                <option value="{{ gif }}" {% if current_mode == 'gif' and current_gif == gif %}selected{% endif %}>{{ gif }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="button" style="width: 100%;">Show GIF</button>
-        </form>
-    </div>
-    
-    <a href="{{ url_for('restart_service') }}" class="button restart-button">Restart InfoCube</a>
-<div class="section">
-    <h3>Settings</h3>
-    <form action="{{ url_for('update_api_key') }}" method="post">
-        <div style="margin-bottom: 10px;">
-            <label for="weather_api_key">OpenWeatherMap API Key:</label>
-            <input type="text" id="weather_api_key" name="weather_api_key" 
-                   value="{{ weather_api_key }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-container">
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">
+                    <span class="flash-icon">
+                        {% if category == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                        {% else %}
+                        <i class="fas fa-exclamation-circle"></i>
+                        {% endif %}
+                    </span>
+                    {{ message }}
+                </div>
+            {% endfor %}
         </div>
-        <button type="submit" class="button" style="width: 100%;">Update API Key</button>
-    </form>
-</div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="container">
+        <h1 style="text-align: center; margin-bottom: 20px;">InfoCube Remote</h1>
+        
+        <!-- Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>System Status</h3>
+                <div>
+                    {% if is_running %}
+                        <span class="status-indicator status-active"></span> Active
+                    {% else %}
+                        <span class="status-indicator status-inactive"></span> Inactive
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="status-info">
+                    <span class="status-label">Current Mode:</span>
+                    <span class="status-value">{{ current_mode|capitalize }}</span>
+                </div>
+                
+                {% if current_mode == "gif" %}
+                <div class="status-info">
+                    <span class="status-label">Current GIF:</span>
+                    <span class="status-value">{{ current_gif }}</span>
+                </div>
+                {% endif %}
+                
+                <a href="{{ url_for('restart_service') }}" class="btn btn-warning btn-block">
+                    <i class="fas fa-redo"></i> Restart InfoCube
+                </a>
+            </div>
+        </div>
+        
+        <!-- Display Modes Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Display Modes</h3>
+            </div>
+            <div class="card-body">
+                <div class="btn-group">
+                    <a href="{{ url_for('set_mode', mode='clock') }}" class="btn btn-primary {% if current_mode == 'clock' %}active-mode{% endif %}">
+                        <i class="fas fa-clock"></i> Clock
+                    </a>
+                    <a href="{{ url_for('set_mode', mode='prayer') }}" class="btn btn-primary {% if current_mode == 'prayer' %}active-mode{% endif %}">
+                        <i class="fas fa-pray"></i> Prayer
+                    </a>
+                    <a href="{{ url_for('set_mode', mode='intro') }}" class="btn btn-primary {% if current_mode == 'intro' %}active-mode{% endif %}">
+                        <i class="fas fa-image"></i> Intro
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- GIFs Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>GIFs</h3>
+                <div>
+                    <span class="status-indicator {% if current_mode == 'gif' %}status-active{% endif %}"></span>
+                    {% if current_mode == 'gif' %}Active{% else %}Inactive{% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="tabs">
+                    <div class="tab active" data-tab="existing-gifs">
+                        <i class="fas fa-images"></i> Gallery
+                    </div>
+                    <div class="tab" data-tab="add-gif-url">
+                        <i class="fas fa-link"></i> Add from URL
+                    </div>
+                    <div class="tab" data-tab="upload-gif">
+                        <i class="fas fa-upload"></i> Upload
+                    </div>
+                </div>
+                
+                <!-- Existing GIFs Tab -->
+                <div class="tab-content active" id="existing-gifs">
+                    {% if available_gifs %}
+                    <div class="gif-grid">
+                        {% for gif in available_gifs %}
+                        <div class="gif-item {% if current_mode == 'gif' and current_gif == gif %}active{% endif %}">
+                            <div class="gif-placeholder">
+                                <i class="fas fa-play-circle"></i>
+                            </div>
+                            <span class="gif-name">{{ gif }}</span>
+                            <div class="gif-actions">
+                                <form action="{{ url_for('set_gif') }}" method="post" style="display: inline;">
+                                    <input type="hidden" name="gif_name" value="{{ gif }}">
+                                    <button type="submit" class="btn btn-success gif-action-btn">
+                                        <i class="fas fa-play"></i> Play
+                                    </button>
+                                </form>
+                                <a href="{{ url_for('delete_gif', gif_name=gif) }}" 
+                                   class="btn btn-danger gif-action-btn"
+                                   onclick="return confirm('Are you sure you want to delete this GIF?');">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; padding: 30px;">
+                        <i class="fas fa-film" style="font-size: 3rem; color: #adb5bd; margin-bottom: 15px;"></i>
+                        <p>No GIFs available. Add some using the tabs above!</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Add GIF from URL Tab -->
+                <div class="tab-content" id="add-gif-url">
+                    <form action="{{ url_for('add_gif') }}" method="post">
+                        <div class="form-group">
+                            <label for="gif_url">GIF URL</label>
+                            <input type="url" id="gif_url" name="gif_url" class="form-control" 
+                                   placeholder="https://example.com/animation.gif" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="gif_name">Custom Name (optional)</label>
+                            <input type="text" id="gif_name" name="gif_name" class="form-control" 
+                                   placeholder="my_cool_animation">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-plus"></i> Add GIF
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Upload GIF Tab -->
+                <div class="tab-content" id="upload-gif">
+                    <form action="{{ url_for('upload_gif') }}" method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="gif_file">Select GIF File</label>
+                            <input type="file" id="gif_file" name="gif_file" class="form-control" 
+                                   accept=".gif" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="gif_upload_name">Custom Name (optional)</label>
+                            <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control" 
+                                   placeholder="my_cool_animation">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-upload"></i> Upload GIF
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Settings</h3>
+                <i class="fas fa-cog"></i>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('update_api_key') }}" method="post">
+                    <div class="form-group">
+                        <label for="weather_api_key">OpenWeatherMap API Key</label>
+                        <div style="position: relative;">
+                            <input type="password" id="weather_api_key" name="weather_api_key" 
+                                   class="form-control" placeholder="Enter your API key" 
+                                   value="{{ masked_api_key }}">
+                            <button type="button" id="toggle-api-key" 
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer;">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="display: block; margin-top: 5px; color: #6c757d;">
+                            Get your API key at <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a>
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 0.9rem;">
+        <p>InfoCube Remote Control v1.0</p>
+    </footer>
+
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Show content for active tab
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // Toggle API key visibility
+        document.getElementById('toggle-api-key').addEventListener('click', function() {
+            const apiKeyInput = document.getElementById('weather_api_key');
+            const toggleIcon = this.querySelector('i');
+            
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                apiKeyInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        });
+        
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(() => {
+            const flashMessages = document.querySelectorAll('.flash');
+            flashMessages.forEach(message => {
+                message.style.display = 'none';
+            });
+        }, 5000);
+    </script>
 </body>
 </html>

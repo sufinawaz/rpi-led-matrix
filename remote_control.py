@@ -45,20 +45,20 @@ def scan_gifs():
 def change_display_mode(mode, gif_name=None):
     """Change the InfoCube display mode by restarting the service with new parameters"""
     global current_mode, current_gif
-    
+
     # Get current environment variables from the service
     weather_api_key = get_weather_api_key()
-    
+
     # Build the ExecStart command
     exec_command = f"/usr/bin/python3 {PROJECT_ROOT}/src/infocube.py --display-mode={mode}"
     if mode == "gif" and gif_name:
         exec_command += f" --gif-name={gif_name}"
         current_gif = gif_name
-    
+
     # Modify the service file
     try:
         logger.info(f"Updating service to mode: {mode}")
-        
+
         # Create a new temporary service file
         with open('/tmp/infocube-display.service', 'w') as f:
             f.write(f"""[Unit]
@@ -77,14 +77,14 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 """)
-        
+
         # Replace the existing service file
         subprocess.run(["sudo", "cp", "/tmp/infocube-display.service", "/etc/systemd/system/infocube-display.service"], check=True)
-        
+
         # Reload systemd and restart the service
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
         subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
-        
+
         current_mode = mode
         logger.info(f"Display mode changed to: {mode}")
         return True
@@ -102,7 +102,7 @@ def get_current_status():
             check=False
         )
         status = result.stdout.strip()
-        
+
         # If service is running, get the command to see the current mode
         if status == "active":
             cmd_result = subprocess.run(
@@ -112,7 +112,7 @@ def get_current_status():
                 check=False
             )
             cmd_line = cmd_result.stdout.strip()
-            
+
             # Extract mode from command line
             if "--display-mode=clock" in cmd_line:
                 current_mode = "clock"
@@ -126,7 +126,7 @@ def get_current_status():
                 if "--gif-name=" in cmd_line:
                     gif_part = cmd_line.split("--gif-name=")[1]
                     current_gif = gif_part.split(" ")[0]
-            
+
             return True, status
         else:
             return False, status
@@ -144,14 +144,14 @@ def get_weather_api_key():
             check=False
         )
         env_line = result.stdout.strip()
-        
+
         # Extract the WEATHER_APP_ID if present
         if "WEATHER_APP_ID=" in env_line:
             env_parts = env_line.split("=", 1)[1].strip('"').split(" ")
             for part in env_parts:
                 if part.startswith("WEATHER_APP_ID="):
                     return part.split("=", 1)[1]
-        
+
         return ""
     except Exception as e:
         logger.error(f"Error getting API key: {e}")
@@ -172,12 +172,12 @@ def download_gif(url, custom_name=None):
         response = requests.get(url, stream=True)
         if response.status_code != 200:
             return False, f"Failed to download GIF: HTTP {response.status_code}"
-        
+
         # Check if it's actually a GIF
         content_type = response.headers.get('Content-Type', '')
         if 'image/gif' not in content_type:
             return False, f"URL does not point to a GIF image (Content-Type: {content_type})"
-        
+
         # Generate a filename
         if custom_name:
             # Clean up the custom name
@@ -191,21 +191,21 @@ def download_gif(url, custom_name=None):
                 safe_name = secure_filename(os.path.splitext(url_filename)[0])
             else:
                 safe_name = f"gif_{uuid.uuid4().hex[:8]}"
-        
+
         # Make sure we don't overwrite existing files
         target_path = os.path.join(GIF_DIR, f"{safe_name}.gif")
         counter = 1
         while os.path.exists(target_path):
             target_path = os.path.join(GIF_DIR, f"{safe_name}_{counter}.gif")
             counter += 1
-        
+
         # Save the file
         with open(target_path, 'wb') as f:
             shutil.copyfileobj(response.raw, f)
-        
+
         logger.info(f"Downloaded GIF to {target_path}")
         return True, os.path.splitext(os.path.basename(target_path))[0]
-    
+
     except Exception as e:
         logger.error(f"Error downloading GIF: {e}")
         return False, str(e)
@@ -216,7 +216,7 @@ def index():
     is_running, service_status = get_current_status()
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
-    
+
     return render_template(
         'index.html', 
         current_mode=current_mode,
@@ -229,7 +229,7 @@ def index():
 
 @app.route('/set_mode/<mode>')
 def set_mode(mode):
-    if mode in ['clock', 'prayer', 'intro']:
+    if mode in ['clock', 'prayer', 'intro', 'moon']:
         change_display_mode(mode)
     return redirect(url_for('index'))
 
@@ -255,12 +255,12 @@ def restart_service():
 def update_api_key():
     """Update the OpenWeatherMap API key"""
     api_key = request.form.get('weather_api_key', '')
-    
+
     try:
         # Get current service file content
         with open('/etc/systemd/system/infocube-display.service', 'r') as f:
             service_content = f.read()
-        
+
         # Update Environment line
         if 'Environment=' in service_content:
             lines = service_content.split('\n')
@@ -268,7 +268,7 @@ def update_api_key():
                 if line.startswith('Environment='):
                     lines[i] = f'Environment="WEATHER_APP_ID={api_key}"'
                     break
-            
+
             updated_content = '\n'.join(lines)
         else:
             # If no Environment line found, add it after ExecStart
@@ -277,20 +277,20 @@ def update_api_key():
                 if line.startswith('ExecStart='):
                     lines.insert(i+1, f'Environment="WEATHER_APP_ID={api_key}"')
                     break
-            
+
             updated_content = '\n'.join(lines)
-        
+
         # Write updated content
         with open('/tmp/infocube-display.service', 'w') as f:
             f.write(updated_content)
-        
+
         # Replace the existing service file
         subprocess.run(["sudo", "cp", "/tmp/infocube-display.service", "/etc/systemd/system/infocube-display.service"], check=True)
-        
+
         # Reload and restart
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
         subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
-        
+
         logger.info(f"Updated API key successfully")
         flash("API key updated successfully", "success")
         return redirect(url_for('index'))
@@ -304,20 +304,20 @@ def add_gif():
     """Add a new GIF from URL"""
     gif_url = request.form.get('gif_url', '')
     custom_name = request.form.get('gif_name', '')
-    
+
     if not gif_url:
         flash("Please provide a GIF URL", "error")
         return redirect(url_for('index'))
-    
+
     success, result = download_gif(gif_url, custom_name)
-    
+
     if success:
         flash(f"GIF '{result}' added successfully", "success")
         # Auto-select the new GIF
         change_display_mode('gif', result)
     else:
         flash(f"Error adding GIF: {result}", "error")
-    
+
     return redirect(url_for('index'))
 
 @app.route('/upload_gif', methods=['POST'])
@@ -326,18 +326,18 @@ def upload_gif():
     if 'gif_file' not in request.files:
         flash("No file selected", "error")
         return redirect(url_for('index'))
-    
+
     gif_file = request.files['gif_file']
     custom_name = request.form.get('gif_upload_name', '')
-    
+
     if gif_file.filename == '':
         flash("No file selected", "error")
         return redirect(url_for('index'))
-    
+
     if not gif_file.filename.lower().endswith('.gif'):
         flash("Only GIF files are allowed", "error")
         return redirect(url_for('index'))
-    
+
     try:
         # Generate a filename
         if custom_name:
@@ -350,28 +350,28 @@ def upload_gif():
             safe_name = secure_filename(os.path.splitext(gif_file.filename)[0])
             if not safe_name:
                 safe_name = f"gif_{uuid.uuid4().hex[:8]}"
-        
+
         # Make sure we don't overwrite existing files
         target_path = os.path.join(GIF_DIR, f"{safe_name}.gif")
         counter = 1
         while os.path.exists(target_path):
             target_path = os.path.join(GIF_DIR, f"{safe_name}_{counter}.gif")
             counter += 1
-        
+
         # Save the file
         gif_file.save(target_path)
-        
+
         gif_name = os.path.splitext(os.path.basename(target_path))[0]
         logger.info(f"Uploaded GIF to {target_path}")
         flash(f"GIF '{gif_name}' uploaded successfully", "success")
-        
+
         # Auto-select the new GIF
         change_display_mode('gif', gif_name)
-        
+
     except Exception as e:
         logger.error(f"Error uploading GIF: {e}")
         flash(f"Error uploading GIF: {e}", "error")
-    
+
     return redirect(url_for('index'))
 
 @app.route('/delete_gif/<gif_name>')
@@ -382,7 +382,7 @@ def delete_gif(gif_name):
         if os.path.exists(gif_path):
             os.remove(gif_path)
             logger.info(f"Deleted GIF: {gif_path}")
-            
+
             # If we're currently displaying this GIF, switch to clock mode
             if current_mode == 'gif' and current_gif == gif_name:
                 change_display_mode('clock')
@@ -394,7 +394,7 @@ def delete_gif(gif_name):
     except Exception as e:
         logger.error(f"Error deleting GIF: {e}")
         flash(f"Error deleting GIF: {e}", "error")
-    
+
     return redirect(url_for('index'))
 
 if __name__ == '__main__':

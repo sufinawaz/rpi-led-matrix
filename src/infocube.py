@@ -274,9 +274,8 @@ class InfoCube:
             color=(220, 220, 255),  # Slightly blue-white color for the moon
             show_text=True
         )
-
-    # Start the animation
-    moon.start()
+        # Start the animation
+        moon.start()
 
     def display_startup_logo(self, canvas):
         """Display the Wood Mistry logo for startup"""

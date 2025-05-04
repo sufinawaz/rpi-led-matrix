@@ -9,6 +9,9 @@ import argparse
 import requests
 from rgbmatrix import graphics, RGBMatrix, RGBMatrixOptions
 
+from src.matrix_manager import MatrixManager
+from src.moon_phase import get_moon_phase_image, calculate_moon_phase
+
 # Configure logging - simplified
 logging.basicConfig(
     level=logging.INFO,
@@ -266,23 +269,92 @@ class InfoCube:
 
     def display_moon_phase(self, canvas):
         """Display the current moon phase"""
-        # Import at the function level to avoid circular imports
-        from animations.moon_phase import MoonPhase
+        logger.info("Starting moon phase display")
+
+        # Create a MatrixManager instance to work with the animations
+        matrix_manager = MatrixManager(
+            rows=self.matrix.height,
+            cols=self.matrix.width,
+            chain_length=1,
+            brightness=self.options.brightness,
+            hardware_mapping=self.options.hardware_mapping,
+            gpio_slowdown=self.options.gpio_slowdown
+        )
+
+        # Update interval in seconds
+        update_interval = 3600  # Update every hour
+        last_update = 0
 
         try:
-            # Create a moon phase animation
-            moon = MoonPhase(
-                self.matrix,
+            # Initial moon phase
+            moon_size = (matrix_manager.width // 2, matrix_manager.width // 2)
+            phase_name, moon_image = get_moon_phase_image(
+                size=moon_size,
                 color=(220, 220, 255),  # Slightly blue-white color for the moon
-                show_text=True
+                bg_color=(0, 0, 0)      # Black background
             )
 
-            # Start the animation
-            moon.start()
+            logger.info(f"Current moon phase: {phase_name}")
+
+            while True:
+                # Get current time
+                current_time = time.time()
+
+                # Check if it's time to update the moon display
+                if current_time - last_update >= update_interval:
+                    # Get the current moon phase and image
+                    phase_name, moon_image = get_moon_phase_image(
+                        size=moon_size,
+                        color=(220, 220, 255),
+                        bg_color=(0, 0, 0)
+                    )
+
+                    logger.info(f"Current moon phase: {phase_name}")
+                    last_update = current_time
+
+                # Create a new image for the canvas
+                display_image = Image.new("RBG", (self.matrix.width, self.matrix.height), (0, 0, 0))
+
+                # Calculate position to place the moon image (centered)
+                if moon_image:
+                    moon_pos_x = (self.matrix.width - moon_image.width) // 2
+                    moon_pos_y = 2  # Position near the top to leave room for text
+
+                    # Paste the moon image
+                    display_image.paste(moon_image, (moon_pos_x, moon_pos_y))
+
+                    # Optional: Add phase name text at the bottom
+                    day, date, month, _ = get_date_time()
+
+                    # Display date
+                    graphics.DrawText(canvas, self.fontSmall, 3, self.matrix.height - 7, 
+                                    self.color['skyBlue'], f"{day} {date} {month}")
+
+                    # Display phase name
+                    phase_text = phase_name
+                    if len(phase_text) > 10:  # Shorten long phase names
+                        if "Waxing" in phase_text:
+                            phase_text = "Waxing"
+                        elif "Waning" in phase_text:
+                            phase_text = "Waning"
+
+                    graphics.DrawText(canvas, self.fontSmall, 3, self.matrix.height - 14, 
+                                    self.color['white'], phase_text)
+
+                # Display the image
+                canvas.SetImage(display_image, 0, 0)
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                # Sleep to maintain a reasonable frame rate
+                time.sleep(0.1)
+
+        except KeyboardInterrupt:
+            logger.info("Moon phase display stopped by user")
+            canvas.Clear()
+            self.matrix.SwapOnVSync(canvas)
         except Exception as e:
-            logger.error(f"Error displaying moon phase: {e}")
-            # Show an error message on the matrix
-            self.display_hmarquee(canvas, f"Moon Phase Error: {str(e)}")
+            logger.error(f"Error in moon phase display: {e}")
+            raise
 
     def display_startup_logo(self, canvas):
         """Display the Wood Mistry logo for startup"""

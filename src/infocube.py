@@ -266,14 +266,15 @@ class InfoCube:
 
     def display_moon_phase(self, canvas):
         """Display the current moon phase"""
-        from src.animations.moon_phase import MoonPhase
-
+        from animations.moon_phase import MoonPhase
+        
         # Create a moon phase animation
         moon = MoonPhase(
             self.matrix,
             color=(220, 220, 255),  # Slightly blue-white color for the moon
             show_text=True
         )
+        
         # Start the animation
         moon.start()
 

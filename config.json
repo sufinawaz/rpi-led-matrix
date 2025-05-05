@@ -1,60 +1,72 @@
 {
-    "matrix": {
-      "rows": 32,
-      "cols": 64,
-      "chain_length": 1,
-      "brightness": 40,
-      "hardware_mapping": "adafruit-hat",
-      "gpio_slowdown": 2
-    },
-    "api_keys": {
-      "openweathermap": "",
-      "newsapi": ""
-    },
-    "defaults": {
-      "scroll_speed": 20,
-      "fps": 30,
-      "font": "7x13.bdf",
-      "color": [255, 255, 255]
-    },
-    "plugins": {
-      "enabled": ["clock", "weather", "prayer", "gif", "moon", "intro"],
-      "default": "clock",
-      "settings": {
-        "weather": {
-          "update_interval": 3600,
-          "city_id": 4791160,
-          "units": "imperial"
-        },
-        "prayer": {
-          "latitude": 38.903481,
-          "longitude": -77.262817,
-          "method": 1,
-          "show_mosque_image": true,
-          "mosque_image_path": "resources/images/mosque.jpg"
-        },
-        "clock": {
-          "show_seconds": false,
-          "format_24h": true,
-          "update_interval": 3600,
-          "city_id": 4791160,
-          "units": "imperial"
-        },
-        "gif": {
-          "directory": "resources/images/gifs",
-          "current_gif": "matrix",
-          "show_clock": true
-        },
-        "moon": {
-          "update_interval": 3600,
-          "show_text": true,
-          "color": [220, 220, 255],
-          "bg_color": [0, 0, 0]
-        },
-        "intro": {
-          "display_time": 10,
-          "logo_path": "resources/images/wm.jpg"
-        }
+  "matrix": {
+    "rows": 32,
+    "cols": 64,
+    "chain_length": 1,
+    "brightness": 40,
+    "hardware_mapping": "adafruit-hat",
+    "gpio_slowdown": 2
+  },
+  "api_keys": {
+    "openweathermap": "",
+    "newsapi": "",
+    "finnhub": ""
+  },
+  "defaults": {
+    "scroll_speed": 20,
+    "fps": 30,
+    "font": "7x13.bdf",
+    "color": [255, 255, 255]
+  },
+  "plugins": {
+    "enabled": ["clock", "weather", "prayer", "gif", "moon", "intro", "stock"],
+    "default": "clock",
+    "settings": {
+      "weather": {
+        "update_interval": 3600,
+        "city_id": 4791160,
+        "units": "imperial"
+      },
+      "prayer": {
+        "latitude": 38.903481,
+        "longitude": -77.262817,
+        "method": 1,
+        "show_mosque_image": true,
+        "mosque_image_path": "resources/images/mosque.jpg"
+      },
+      "clock": {
+        "show_seconds": false,
+        "format_24h": true,
+        "update_interval": 3600,
+        "city_id": 4791160,
+        "units": "imperial"
+      },
+      "gif": {
+        "directory": "resources/images/gifs",
+        "current_gif": "matrix",
+        "show_clock": true
+      },
+      "moon": {
+        "update_interval": 3600,
+        "show_text": true,
+        "color": [220, 220, 255],
+        "bg_color": [0, 0, 0]
+      },
+      "intro": {
+        "display_time": 10,
+        "logo_path": "resources/images/wm.jpg"
+      },
+      "stock": {
+        "symbols": ["RKT", "APPL", "META"],
+        "api_key": "",
+        "update_interval": 3600,
+        "time_period": "day",
+        "graph_colors": [
+          [0, 255, 0],
+          [0, 191, 255],
+          [255, 165, 0]
+        ]
       }
     }
   }
+}

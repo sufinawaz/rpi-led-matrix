@@ -6,6 +6,7 @@ from .prayer_plugin import PrayerPlugin
 from .gif_plugin import GifPlugin
 from .moon_plugin import MoonPlugin
 from .intro_plugin import IntroPlugin
+from .stock_plugin import StockPlugin
 
 __all__ = [
     'DisplayPlugin',
@@ -14,5 +15,6 @@ __all__ = [
     'WeatherPlugin',
     'PrayerPlugin',
     'GifPlugin',
-    'MoonPlugin'
+    'MoonPlugin',
+    'StockPlugin'
 ]

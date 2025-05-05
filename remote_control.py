@@ -23,7 +23,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For flash messages
 
 # Use the correct project root directory
-PROJECT_ROOT = "/home/pi/code/rpi-led-matrix"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ''))
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.json")
 GIF_DIR = os.path.join(PROJECT_ROOT, "resources", "images", "gifs")
 
@@ -164,6 +164,10 @@ def get_current_status():
                 current_mode = "intro"
             elif "--display-mode=moon" in cmd_line:
                 current_mode = "moon"
+            elif "--display-mode=stock" in cmd_line:
+                current_mode = "stock"
+            elif "--display-mode=weather" in cmd_line:
+                current_mode = "weather"
             elif "--display-mode=gif" in cmd_line:
                 current_mode = "gif"
                 # Try to extract gif name
@@ -239,7 +243,8 @@ def get_plugin_description(plugin_name):
         "gif": "Animated GIF display",
         "intro": "Introduction screen",
         "moon": "Moon phase display",
-        "weather": "Detailed weather information"
+        "weather": "Detailed weather information",
+        "stock": "Stock ticker display"
     }
     return descriptions.get(plugin_name, "")
 
@@ -264,7 +269,8 @@ def index():
 
 @app.route('/set_mode/<mode>')
 def set_mode(mode):
-    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather']:
+    logger.info(f"Setting mode to: {mode}")
+    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather', 'stock']:
         change_display_mode(mode)
     return redirect(url_for('index'))
 
@@ -341,9 +347,74 @@ def update_api_key():
         flash(f"Error updating API key: {e}", "error")
         return redirect(url_for('index'))
 
+# Add this code to your remote_control.py file to handle Finnhub API key
+
 @app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
 def plugin_config(plugin_name):
     """Get or update plugin configuration"""
+    # Special handling for stock plugin with Finnhub API
+    if plugin_name == 'stock':
+        if request.method == 'POST':
+            # Get basic settings
+            api_key = request.form.get('api_key', '')
+            time_period = request.form.get('time_period', 'day')
+            update_interval = int(request.form.get('update_interval', 3600))
+
+            # Ensure minimum update interval
+            update_interval = max(60, update_interval)
+
+            # Process stock symbols
+            symbols = []
+            for i in range(3):  # Up to 3 stocks
+                symbol = request.form.get(f'symbols_{i}', '').strip().upper()
+                if symbol:
+                    symbols.append(symbol)
+
+            # Process graph colors
+            graph_colors = []
+            for i in range(3):  # Up to 3 colors
+                r = int(request.form.get(f'graph_color_r_{i}', 0))
+                g = int(request.form.get(f'graph_color_g_{i}', 255))
+                b = int(request.form.get(f'graph_color_b_{i}', 0))
+                graph_colors.append([r, g, b])
+
+            # Create config
+            plugin_config = {
+                'api_key': api_key,
+                'time_period': time_period,
+                'update_interval': update_interval,
+                'symbols': symbols,
+                'graph_colors': graph_colors
+            }
+
+            # Update the API key in the overall config too if provided
+            if api_key:
+                config = load_config()
+                if "api_keys" not in config:
+                    config["api_keys"] = {}
+                config["api_keys"]["finnhub"] = api_key
+                save_config(config)
+
+            # Update configuration
+            update_plugin_config(plugin_name, plugin_config)
+
+            # Restart service to apply changes
+            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+            flash(f"Configuration for {plugin_name} updated successfully", "success")
+            return redirect(url_for('index'))
+
+        # GET request - show config page
+        template_name = 'stock_config.html'
+        plugin_config = get_plugin_config(plugin_name)
+        return render_template(
+            template_name,
+            plugin_name=plugin_name,
+            plugin_config=plugin_config,
+            description=get_plugin_description(plugin_name)
+        )
+
+    # Standard plugin config handling
     if request.method == 'POST':
         # Update configuration
         plugin_config = request.form.to_dict()

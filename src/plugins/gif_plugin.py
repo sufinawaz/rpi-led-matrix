@@ -37,7 +37,7 @@ class GifPlugin(DisplayPlugin):
 
         # Create animated image component
         self.gif_component = None
-        
+
         # Track errors to avoid constant logging
         self.reported_error = False
 
@@ -51,7 +51,7 @@ class GifPlugin(DisplayPlugin):
 
         # Load the GIF
         self._load_gif()
-        
+
         # Reset error reporting flag
         self.reported_error = False
 
@@ -72,7 +72,7 @@ class GifPlugin(DisplayPlugin):
             # Create animated image component with proper error handling
             self.gif_component = AnimatedImageComponent(0, 0, gif_path, fps=10)
             print(f"Successfully loaded GIF: {gif_path}")
-            
+
             # Verify all frames are in RGB mode
             if hasattr(self.gif_component, 'frames') and self.gif_component.frames:
                 for i, frame in enumerate(self.gif_component.frames):
@@ -108,14 +108,14 @@ class GifPlugin(DisplayPlugin):
                         if current_frame.mode != 'RGB':
                             current_frame = current_frame.convert('RGB')
                             self.gif_component.frames[current_frame_idx] = current_frame
-                
+
                 # Now render the component
                 self.gif_component.render(canvas)
             except Exception as e:
                 if not self.reported_error:
                     print(f"Error rendering GIF: {e}")
                     self.reported_error = True
-                    
+
                 # Try to recover - draw an error message
                 text = "GIF Error"
                 text_width = len(text) * 7  # Approximate width per character

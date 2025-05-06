@@ -457,6 +457,48 @@
                 display: none;
             }
         }
+
+        /* Power control buttons */
+        .power-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+
+        .power-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .power-btn i {
+            font-size: 1rem;
+        }
+
+        .btn-start {
+            background-color: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background-color: #059669;
+            border-color: #059669;
+        }
+
+        .btn-stop {
+            background-color: #ef4444;
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background-color: #dc2626;
+            border-color: #dc2626;
+        }
     </style>
 </head>
 
@@ -509,9 +551,18 @@
                 </div>
                 {% endif %}
 
-                <a href="{{ url_for('restart_service') }}" class="btn btn-warning btn-block">
-                    <i class="fas fa-redo"></i> Restart InfoCube
-                </a>
+                <!-- Power control buttons -->
+                <div class="power-controls">
+                    <a href="{{ url_for('start_service_route') }}" class="btn btn-start power-btn" {% if is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
+                        <i class="fas fa-play"></i> Start
+                    </a>
+                    <a href="{{ url_for('restart_service') }}" class="btn btn-warning power-btn" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
+                        <i class="fas fa-redo"></i> Restart
+                    </a>
+                    <a href="{{ url_for('stop_service_route') }}" class="btn btn-stop power-btn" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
+                        <i class="fas fa-stop"></i> Stop
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -537,6 +588,10 @@
                             <i class="fas fa-moon"></i>
                             {% elif plugin.name == 'weather' %}
                             <i class="fas fa-cloud-sun"></i>
+                            {% elif plugin.name == 'stock' %}
+                            <i class="fas fa-chart-line"></i>
+                            {% elif plugin.name == 'wmata' %}
+                            <i class="fas fa-subway"></i>
                             {% else %}
                             <i class="fas fa-plug"></i>
                             {% endif %}
@@ -547,7 +602,7 @@
                         </div>
                     </div>
                     <div class="plugin-actions">
-                        <a href="{{ url_for('set_mode', mode=plugin.name) }}" class="btn btn-primary {% if plugin.active %}active-mode{% endif %}">
+                        <a href="{{ url_for('set_mode', mode=plugin.name) }}" class="btn btn-primary {% if plugin.active %}active-mode{% endif %}" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
                             <i class="fas fa-play"></i> Activate
                         </a>
                         <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}" class="btn btn-secondary">
@@ -594,7 +649,7 @@
                             <div class="gif-actions">
                                 <form action="{{ url_for('set_gif') }}" method="post" style="display: inline;">
                                     <input type="hidden" name="gif_name" value="{{ gif }}">
-                                    <button type="submit" class="btn btn-success gif-action-btn">
+                                    <button type="submit" class="btn btn-success gif-action-btn" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
                                         <i class="fas fa-play"></i> Play
                                     </button>
                                 </form>
@@ -628,7 +683,7 @@
                             <input type="text" id="gif_name" name="gif_name" class="form-control"
                                 placeholder="my_cool_animation">
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">
+                        <button type="submit" class="btn btn-primary btn-block" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
                             <i class="fas fa-plus"></i> Add GIF
                         </button>
                     </form>
@@ -647,7 +702,7 @@
                             <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control"
                                 placeholder="my_cool_animation">
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">
+                        <button type="submit" class="btn btn-primary btn-block" {% if not is_running %}disabled style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
                             <i class="fas fa-upload"></i> Upload GIF
                         </button>
                     </form>
@@ -687,7 +742,7 @@
     </div>
 
     <footer style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 0.9rem;">
-        <p>InfoCube Remote Control v1.0</p>
+        <p>InfoCube Remote Control v1.1</p>
     </footer>
 
     <script>

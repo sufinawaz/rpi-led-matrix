@@ -76,7 +76,7 @@ class StockPlugin(DisplayPlugin):
 
         # Check for API key
         if not self.config.get('api_key'):
-            logger.warning("No Finnhub API key configured")
+            logger.warning("No Finnhub API key configured in plugin settings")
             # Try to get API key from config file
             try:
                 config_path = os.path.join(os.path.dirname(__file__), '../../config.json')
@@ -94,6 +94,29 @@ class StockPlugin(DisplayPlugin):
 
         # Initial data fetch
         self._fetch_stock_data()
+
+    def _get_api_key(self):
+        """Get the API key, checking multiple possible locations"""
+        # First, check the plugin config
+        api_key = self.config.get('api_key', '')
+        if api_key:
+            return api_key
+
+        # If not found, try the main config file
+        try:
+            config_path = os.path.join(os.path.dirname(__file__), '../../config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                    api_key = config_data.get('api_keys', {}).get('finnhub', '')
+                    if api_key:
+                        # Save it to the plugin config for future use
+                        self.config['api_key'] = api_key
+                        return api_key
+        except Exception as e:
+            logger.error(f"Error reading config.json for API key: {e}")
+
+        return ''
 
     def _get_time_period_params(self):
         """Get the time period parameters for Finnhub API"""
@@ -120,7 +143,7 @@ class StockPlugin(DisplayPlugin):
 
     def _fetch_stock_data(self):
         """Fetch stock data from Finnhub API"""
-        api_key = self.config.get('api_key', '')
+        api_key = self._get_api_key()
         if not api_key:
             logger.error("No API key configured for stock data")
             for symbol in self.config.get('symbols', []):
@@ -156,18 +179,25 @@ class StockPlugin(DisplayPlugin):
 
             try:
                 # Add timeout and headers for better API behavior
-                # headers = {
-                #     'User-Agent': 'InfoCube Stock Display/1.0',
-                #     'X-Finnhub-Token': api_key
-                # }
+                headers = {
+                    'User-Agent': 'InfoCube Stock Display/1.0',
+                    'X-Finnhub-Token': api_key
+                }
 
-                response = requests.get(url, params=params, timeout=10)
+                response = requests.get(
+                    url, 
+                    params=params, 
+                    headers=headers,
+                    timeout=10
+                )
 
                 # Log response status
                 logger.info(f"API response status for {symbol}: {response.status_code}")
 
+                # Log response details if error occurs
                 if response.status_code != 200:
                     logger.error(f"API error for {symbol}: HTTP {response.status_code}")
+                    logger.error(f"Response content: {response.text[:200]}")  # Log first 200 chars
                     self.stock_error[symbol] = f"API error: HTTP {response.status_code}"
                     continue
 
@@ -364,4 +394,11 @@ class StockPlugin(DisplayPlugin):
                              self.colors['error'], "Stock API")
             graphics.DrawText(canvas, self.font, 2, 25, 
                              self.colors['error'], "Error")
+
+            # Display the specific error for debugging
+            first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
+            if len(first_error) > 20:
+                first_error = first_error[:17] + "..."
+            graphics.DrawText(canvas, self.font_small, 2, 31, 
+                            self.colors['white'], first_error)
             return

@@ -251,6 +251,74 @@ def get_plugin_description(plugin_name):
     }
     return descriptions.get(plugin_name, "")
 
+# New functions for start/stop service
+
+def start_service():
+    """Start the InfoCube display service"""
+    try:
+        result = subprocess.run(
+            ["sudo", "systemctl", "is-active", "infocube-display.service"],
+            capture_output=True, 
+            text=True, 
+            check=False
+        )
+        status = result.stdout.strip()
+
+        if status == "active":
+            logger.info("Service already running")
+            return True, "Service is already running"
+
+        # Start the service
+        start_result = subprocess.run(
+            ["sudo", "systemctl", "start", "infocube-display.service"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if start_result.returncode == 0:
+            logger.info("Service started successfully")
+            return True, "Service started successfully"
+        else:
+            logger.error(f"Error starting service: {start_result.stderr}")
+            return False, f"Error starting service: {start_result.stderr}"
+    except Exception as e:
+        logger.error(f"Error starting service: {e}")
+        return False, f"Error starting service: {e}"
+
+def stop_service():
+    """Stop the InfoCube display service"""
+    try:
+        result = subprocess.run(
+            ["sudo", "systemctl", "is-active", "infocube-display.service"],
+            capture_output=True, 
+            text=True, 
+            check=False
+        )
+        status = result.stdout.strip()
+
+        if status != "active":
+            logger.info("Service is not running")
+            return True, "Service is already stopped"
+
+        # Stop the service
+        stop_result = subprocess.run(
+            ["sudo", "systemctl", "stop", "infocube-display.service"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if stop_result.returncode == 0:
+            logger.info("Service stopped successfully")
+            return True, "Service stopped successfully"
+        else:
+            logger.error(f"Error stopping service: {stop_result.stderr}")
+            return False, f"Error stopping service: {stop_result.stderr}"
+    except Exception as e:
+        logger.error(f"Error stopping service: {e}")
+        return False, f"Error stopping service: {e}"
+
 @app.route('/')
 def index():
     # Get the current status, mode, and plugins
@@ -293,6 +361,25 @@ def restart_service():
     except Exception as e:
         logger.error(f"Error restarting service: {e}")
         flash(f"Error restarting service: {e}", "error")
+    return redirect(url_for('index'))
+
+# New routes for start/stop service
+@app.route('/start_service')
+def start_service_route():
+    success, message = start_service()
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "error")
+    return redirect(url_for('index'))
+
+@app.route('/stop_service')
+def stop_service_route():
+    success, message = stop_service()
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "error")
     return redirect(url_for('index'))
 
 @app.route('/update_api_key', methods=['POST'])
@@ -349,8 +436,6 @@ def update_api_key():
         logger.error(f"Error updating API key: {e}")
         flash(f"Error updating API key: {e}", "error")
         return redirect(url_for('index'))
-
-# Add this code to your remote_control.py file to handle Finnhub API key
 
 @app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
 def plugin_config(plugin_name):

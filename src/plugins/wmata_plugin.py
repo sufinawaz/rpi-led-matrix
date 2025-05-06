@@ -52,10 +52,6 @@ class WmataPlugin(DisplayPlugin):
         self.should_scroll = {}  # Whether a station name needs scrolling
         self.scroll_amount = {}  # Total scroll amount needed for each station
 
-        # Clock fonts (will try to get from imports in setup)
-        self.clock_font = None
-        self.temp_font = None
-
         # Font loading
         self.font = graphics.Font()
         self.font_small = graphics.Font()
@@ -72,6 +68,7 @@ class WmataPlugin(DisplayPlugin):
             'silver': graphics.Color(192, 192, 192),
             'yellow': graphics.Color(255, 255, 0),
             'gray': graphics.Color(128, 128, 128),
+            'medium_gray': graphics.Color(100, 100, 100),
             'error': graphics.Color(255, 0, 0)
         }
 
@@ -230,53 +227,20 @@ class WmataPlugin(DisplayPlugin):
 
     def setup(self):
         """Set up the WMATA plugin"""
-        # Try to import fonts from other plugins for consistency
-        self._import_fonts_from_other_plugins()
-
-        # Load fonts if not imported from other plugins
-        if not self.clock_font:
+        # Load fonts - fixed to avoid height attribute errors
+        try:
+            self.font_tiny.LoadFont("resources/fonts/4x6.bdf")
+            self.font_small.LoadFont("resources/fonts/5x7.bdf") 
+            self.font.LoadFont("resources/fonts/7x13.bdf")
+        except Exception as e:
+            logger.error(f"Error loading fonts: {e}")
+            # Try system fonts
             try:
-                self.clock_font = graphics.Font()
-                self.clock_font.LoadFont("resources/fonts/7x13.bdf")  # Same as clock plugin
+                self.font_tiny.LoadFont("/usr/share/fonts/misc/4x6.bdf")
+                self.font_small.LoadFont("/usr/share/fonts/misc/5x7.bdf")
+                self.font.LoadFont("/usr/share/fonts/misc/7x13.bdf")
             except Exception as e:
-                logger.error(f"Error loading clock font: {e}")
-                # Try system fonts
-                try:
-                    self.clock_font.LoadFont("/usr/share/fonts/misc/7x13.bdf")
-                except:
-                    # Fallback to default font
-                    self.font.LoadFont("resources/fonts/6x10.bdf")
-                    self.clock_font = self.font
-
-        if not self.temp_font:
-            try:
-                self.temp_font = graphics.Font()
-                self.temp_font.LoadFont("resources/fonts/5x7.bdf")  # Like temp display on clock
-            except Exception as e:
-                logger.error(f"Error loading temp font: {e}")
-                # Try system fonts
-                try:
-                    self.temp_font.LoadFont("/usr/share/fonts/misc/5x7.bdf")
-                except:
-                    # Fallback to smaller font
-                    self.font_small.LoadFont("resources/fonts/4x6.bdf")
-                    self.temp_font = self.font_small
-
-        # Additional fallback in case we still don't have fonts
-        if not self.clock_font.height or not self.temp_font.height:
-            # Simple fallbacks
-            if not self.font.height:
-                self.font.LoadFont("resources/fonts/6x10.bdf")
-            if not self.font_small.height:
-                self.font_small.LoadFont("resources/fonts/5x7.bdf")
-            if not self.font_tiny.height:
-                self.font_tiny.LoadFont("resources/fonts/4x6.bdf")
-
-            # Assign fallbacks if needed
-            if not self.clock_font.height:
-                self.clock_font = self.font
-            if not self.temp_font.height:
-                self.temp_font = self.font_small
+                logger.error(f"Error loading system fonts: {e}")
 
         # Check configuration
         logger.info(f"WMATA plugin configuration: {self.config}")
@@ -296,24 +260,6 @@ class WmataPlugin(DisplayPlugin):
 
         # Initial data fetch
         self._fetch_train_data()
-
-    def _import_fonts_from_other_plugins(self):
-        """Try to import fonts from other plugins for consistency"""
-        try:
-            # Try to import clock plugin and get its fonts
-            from animations.clock import Clock
-            clock_instance = Clock(self.matrix)
-            if hasattr(clock_instance, 'font'):
-                self.clock_font = clock_instance.font
-                logger.info("Successfully imported clock font")
-
-            # Try to find a font similar to temp display
-            if hasattr(clock_instance, 'font_small'):
-                self.temp_font = clock_instance.font_small
-                logger.info("Successfully imported temperature font")
-        except Exception as e:
-            logger.error(f"Error importing fonts from clock plugin: {e}")
-            # Will fall back to loading fonts directly
 
     def _fetch_train_data(self):
         """Fetch train arrival predictions from WMATA API"""
@@ -463,6 +409,11 @@ class WmataPlugin(DisplayPlugin):
 
             # Draw station info in this half
             self._draw_station_half(draw, display_image, width, half_height, y_offset, station_code)
+
+        # Draw a medium gray line in the middle to separate the two stations
+        separator_y = height // 2
+        for x in range(width):
+            display_image.putpixel((x, separator_y), (100, 100, 100))  # Medium gray color
 
         # Store the complete display
         self.current_display = display_image

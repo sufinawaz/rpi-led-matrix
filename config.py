@@ -6,7 +6,7 @@ MATRIX_CONFIG = {
     'cols': 64,
     'chain_length': 1,
     'parallel': 1,
-    'brightness': 40,
+    'brightness': 30,
     'hardware_mapping': 'adafruit-hat',
     'gpio_slowdown': 2
 }

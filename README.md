@@ -126,9 +126,9 @@ The main configuration file is located at `config.ini` in the project root. Edit
 ```ini
 [MATRIX]
 rows = 32
-cols = 32
+cols = 64
 chain_length = 1
-brightness = 70
+brightness = 30
 hardware_mapping = adafruit-hat
 gpio_slowdown = 2
 

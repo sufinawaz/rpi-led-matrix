@@ -168,6 +168,8 @@ def get_current_status():
                 current_mode = "stock"
             elif "--display-mode=weather" in cmd_line:
                 current_mode = "weather"
+            elif "--display-mode=wmata" in cmd_line:
+                current_mode = "wmata"
             elif "--display-mode=gif" in cmd_line:
                 current_mode = "gif"
                 # Try to extract gif name
@@ -244,7 +246,8 @@ def get_plugin_description(plugin_name):
         "intro": "Introduction screen",
         "moon": "Moon phase display",
         "weather": "Detailed weather information",
-        "stock": "Stock ticker display"
+        "stock": "Stock ticker display",
+        "wmata": "DC Metro train arrival times"
     }
     return descriptions.get(plugin_name, "")
 
@@ -270,7 +273,7 @@ def index():
 @app.route('/set_mode/<mode>')
 def set_mode(mode):
     logger.info(f"Setting mode to: {mode}")
-    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather', 'stock']:
+    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather', 'stock', 'wmata']:
         change_display_mode(mode)
     return redirect(url_for('index'))
 
@@ -353,6 +356,82 @@ def update_api_key():
 def plugin_config(plugin_name):
     """Get or update plugin configuration"""
     # Special handling for stock plugin with Finnhub API
+    if plugin_name == 'wmata':
+        if request.method == 'POST':
+            # Get basic settings
+            api_key = request.form.get('api_key', '')
+            display_mode = request.form.get('display_mode', 'alternating')
+            update_interval = int(request.form.get('update_interval', 30))
+            show_station_name = 'show_station_name' in request.form
+
+            # Ensure minimum update interval
+            update_interval = max(30, update_interval)
+
+            # Process station codes
+            station_codes = []
+            for i in range(4):  # Up to 4 stations
+                station_code = request.form.get(f'station_{i}', '').strip()
+                if station_code:
+                    station_codes.append(station_code)
+
+            # Must have at least one station
+            if not station_codes:
+                flash("Please select at least one Metro station.", "error")
+                plugin_config = get_plugin_config(plugin_name)
+                return render_template(
+                    'wmata_config.html',
+                    plugin_name=plugin_name,
+                    plugin_config=plugin_config,
+                    description=get_plugin_description(plugin_name)
+                )
+
+            # Get line colors from existing config to preserve them
+            existing_config = get_plugin_config(plugin_name)
+            line_colors = existing_config.get('line_colors', {
+                "RD": [255, 0, 0],      # Red
+                "BL": [0, 0, 255],      # Blue
+                "OR": [255, 165, 0],    # Orange
+                "SV": [192, 192, 192],  # Silver
+                "GR": [0, 255, 0],      # Green
+                "YL": [255, 255, 0]     # Yellow
+            })
+
+            # Create config
+            plugin_config = {
+                'api_key': api_key,
+                'display_mode': display_mode,
+                'update_interval': update_interval,
+                'show_station_name': show_station_name,
+                'stations': station_codes,
+                'line_colors': line_colors
+            }
+
+            # Update the API key in the overall config too if provided
+            if api_key:
+                config = load_config()
+                if "api_keys" not in config:
+                    config["api_keys"] = {}
+                config["api_keys"]["wmata"] = api_key
+                save_config(config)
+
+            # Update configuration
+            update_plugin_config(plugin_name, plugin_config)
+
+            # Restart service to apply changes
+            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+            flash(f"Configuration for {plugin_name} updated successfully", "success")
+            return redirect(url_for('index'))
+
+        # GET request - show config page
+        plugin_config = get_plugin_config(plugin_name)
+        return render_template(
+            'wmata_config.html',
+            plugin_name=plugin_name,
+            plugin_config=plugin_config,
+            description=get_plugin_description(plugin_name)
+        )
+
     if plugin_name == 'stock':
         if request.method == 'POST':
             # Get basic settings

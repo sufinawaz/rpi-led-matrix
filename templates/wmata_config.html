@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure WMATA Plugin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --card-bg: #ffffff;
+            --card-border: #e9ecef;
+            --body-bg: #f5f7fb;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: var(--body-bg);
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .container {
+            width: 100%;
+            padding-right: 15px;
+            padding-left: 15px;
+            margin-right: auto;
+            margin-left: auto;
+        }
+
+        .card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            word-wrap: break-word;
+            background-color: var(--card-bg);
+            background-clip: border-box;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #495057;
+            background-color: #fff;
+            background-clip: padding-box;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        }
+
+        label {
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .btn {
+            display: inline-block;
+            font-weight: 500;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            user-select: none;
+            border: 1px solid transparent;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            color: #fff;
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+        }
+
+        .btn-danger {
+            color: #fff;
+            background-color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .station-items {
+            margin-bottom: 20px;
+        }
+
+        .station-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+
+        .station-selector {
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .station-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+        }
+
+        .radio-option input {
+            margin-right: 5px;
+        }
+
+        .description {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .api-info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f9ff;
+            border-left: 4px solid var(--primary);
+            border-radius: 4px;
+        }
+
+        .metro-line-colors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .metro-line {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+        }
+
+        .line-color-swatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .cube-preview {
+            margin: 20px 0;
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+        }
+
+        .cube-preview img {
+            width: 100%;
+            height: auto;
+        }
+
+        .red-line { background-color: #E51636; }
+        .blue-line { background-color: #0076CE; }
+        .orange-line { background-color: #F68712; }
+        .green-line { background-color: #00B551; }
+        .yellow-line { background-color: #FFD200; }
+        .silver-line { background-color: #9D9F9C; }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="{{ url_for('index') }}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+
+        <h1>Configure WMATA Plugin</h1>
+        <p class="description">Display real-time DC Metro train arrival information on your InfoCube in a Cube-style format.</p>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>WMATA Settings</h3>
+            </div>
+            <div class="card-body">
+                <div class="cube-preview">
+                    <img src="https://i.imgur.com/JNLgqx8.png" alt="Cube-style Metro Display" />
+                    <p style="color: white; text-align: center; margin-top: 10px;">Example Display</p>
+                </div>
+
+                <form action="{{ url_for('plugin_config', plugin_name='wmata') }}" method="post">
+                    <div class="form-group">
+                        <label for="api_key">WMATA API Key</label>
+                        <input type="text" class="form-control" id="api_key" name="api_key" value="{{ plugin_config.get('api_key', '') }}">
+                        <div class="api-info">
+                            <p><i class="fas fa-info-circle"></i> A WMATA API key is required to fetch train arrival data.</p>
+                            <p><small>Get a free API key at <a href="https://developer.wmata.com/signup/" target="_blank">developer.wmata.com</a></small></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Display Mode</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="mode_alternating" name="display_mode" value="alternating" {% if plugin_config.get('display_mode') == 'alternating' %}checked{% endif %}>
+                                <label for="mode_alternating">Alternating (rotate between stations)</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="mode_combined" name="display_mode" value="combined" {% if plugin_config.get('display_mode') == 'combined' %}checked{% endif %}>
+                                <label for="mode_combined">Combined (all stations at once)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="update_interval">Update Interval (seconds)</label>
+                        <input type="number" class="form-control" id="update_interval" name="update_interval" value="{{ plugin_config.get('update_interval', 30) }}" min="30">
+                        <small class="form-text text-muted">How often to update train data. Minimum 30 seconds recommended.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max_trains">Maximum Trains Per Station</label>
+                        <input type="number" class="form-control" id="max_trains" name="max_trains" value="{{ plugin_config.get('max_trains', 3) }}" min="1" max="5">
+                        <small class="form-text text-muted">Maximum number of trains to display per station (1-5).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="show_station_name" name="show_station_name" {% if plugin_config.get('show_station_name', True) %}checked{% endif %}>
+                            <label class="form-check-label" for="show_station_name">Show Station Names</label>
+                        </div>
+                    </div>
+
+                    <h4>Metro Stations</h4>
+                    <p class="description">Configure up to 2 Metro stations to display (only 2 will be used)</p>
+
+                    <div class="station-items">
+                        {% for i in range(2) %}
+                        {% set stations = plugin_config.get('stations', ['K04', 'C01']) %}
+                        {% set station_code = stations[i] if i < stations|length else '' %}
+
+                        <div class="station-item">
+                            <select class="form-control station-selector" id="station_{{ i }}" name="station_{{ i }}">
+                                <option value="">Select a station</option>
+                                <!-- Red Line -->
+                                <optgroup label="Red Line">
+                                    <option value="A01" {% if station_code == 'A01' %}selected{% endif %}>Metro Center</option>
+                                    <option value="A02" {% if station_code == 'A02' %}selected{% endif %}>Farragut North</option>
+                                    <option value="A03" {% if station_code == 'A03' %}selected{% endif %}>Dupont Circle</option>
+                                    <option value="A04" {% if station_code == 'A04' %}selected{% endif %}>Woodley Park</option>
+                                    <option value="A05" {% if station_code == 'A05' %}selected{% endif %}>Cleveland Park</option>
+                                    <option value="A06" {% if station_code == 'A06' %}selected{% endif %}>Van Ness-UDC</option>
+                                    <option value="A07" {% if station_code == 'A07' %}selected{% endif %}>Tenleytown-AU</option>
+                                    <option value="A08" {% if station_code == 'A08' %}selected{% endif %}>Friendship Heights</option>
+                                    <option value="A09" {% if station_code == 'A09' %}selected{% endif %}>Bethesda</option>
+                                    <option value="A10" {% if station_code == 'A10' %}selected{% endif %}>Medical Center</option>
+                                    <option value="A11" {% if station_code == 'A11' %}selected{% endif %}>Grosvenor-Strathmore</option>
+                                    <option value="A12" {% if station_code == 'A12' %}selected{% endif %}>White Flint</option>
+                                    <option value="A13" {% if station_code == 'A13' %}selected{% endif %}>Twinbrook</option>
+                                    <option value="A14" {% if station_code == 'A14' %}selected{% endif %}>Rockville</option>
+                                    <option value="A15" {% if station_code == 'A15' %}selected{% endif %}>Shady Grove</option>
+                                    <option value="B01" {% if station_code == 'B01' %}selected{% endif %}>Gallery Place</option>
+                                    <option value="B02" {% if station_code == 'B02' %}selected{% endif %}>Judiciary Square</option>
+                                    <option value="B03" {% if station_code == 'B03' %}selected{% endif %}>Union Station</option>
+                                    <option value="B04" {% if station_code == 'B04' %}selected{% endif %}>Rhode Island Ave</option>
+                                    <option value="B05" {% if station_code == 'B05' %}selected{% endif %}>Brookland-CUA</option>
+                                    <option value="B06" {% if station_code == 'B06' %}selected{% endif %}>Fort Totten</option>
+                                    <option value="B07" {% if station_code == 'B07' %}selected{% endif %}>Takoma</option>
+                                    <option value="B08" {% if station_code == 'B08' %}selected{% endif %}>Silver Spring</option>
+                                    <option value="B09" {% if station_code == 'B09' %}selected{% endif %}>Forest Glen</option>
+                                    <option value="B10" {% if station_code == 'B10' %}selected{% endif %}>Wheaton</option>
+                                    <option value="B11" {% if station_code == 'B11' %}selected{% endif %}>Glenmont</option>
+                                </optgroup>
+                                <!-- Blue/Orange/Silver -->
+                                <optgroup label="Blue/Orange/Silver Lines">
+                                    <option value="C01" {% if station_code == 'C01' %}selected{% endif %}>Metro Center</option>
+                                    <option value="C02" {% if station_code == 'C02' %}selected{% endif %}>McPherson Square</option>
+                                    <option value="C03" {% if station_code == 'C03' %}selected{% endif %}>Farragut West</option>
+                                    <option value="C04" {% if station_code == 'C04' %}selected{% endif %}>Foggy Bottom-GWU</option>
+                                    <option value="C05" {% if station_code == 'C05' %}selected{% endif %}>Rosslyn</option>
+                                    <option value="C06" {% if station_code == 'C06' %}selected{% endif %}>Arlington Cemetery</option>
+                                    <option value="C07" {% if station_code == 'C07' %}selected{% endif %}>Pentagon</option>
+                                    <option value="C08" {% if station_code == 'C08' %}selected{% endif %}>Pentagon City</option>
+                                    <option value="C09" {% if station_code == 'C09' %}selected{% endif %}>Crystal City</option>
+                                    <option value="C10" {% if station_code == 'C10' %}selected{% endif %}>Reagan Airport</option>
+                                    <option value="C11" {% if station_code == 'C11' %}selected{% endif %}>Potomac Yard</option>
+                                    <option value="C12" {% if station_code == 'C12' %}selected{% endif %}>Braddock Road</option>
+                                    <option value="C13" {% if station_code == 'C13' %}selected{% endif %}>King St-Old Town</option>
+                                    <option value="C14" {% if station_code == 'C14' %}selected{% endif %}>Eisenhower Ave</option>
+                                    <option value="C15" {% if station_code == 'C15' %}selected{% endif %}>Huntington</option>
+                                    <option value="D01" {% if station_code == 'D01' %}selected{% endif %}>Federal Triangle</option>
+                                    <option value="D02" {% if station_code == 'D02' %}selected{% endif %}>Smithsonian</option>
+                                    <option value="D03" {% if station_code == 'D03' %}selected{% endif %}>L'Enfant Plaza</option>
+                                    <option value="D04" {% if station_code == 'D04' %}selected{% endif %}>Federal Center SW</option>
+                                    <option value="D05" {% if station_code == 'D05' %}selected{% endif %}>Capitol South</option>
+                                    <option value="D06" {% if station_code == 'D06' %}selected{% endif %}>Eastern Market</option>
+                                    <option value="D07" {% if station_code == 'D07' %}selected{% endif %}>Potomac Ave</option>
+                                    <option value="D08" {% if station_code == 'D08' %}selected{% endif %}>Stadium-Armory</option>
+                                    <option value="D09" {% if station_code == 'D09' %}selected{% endif %}>Minnesota Ave</option>
+                                    <option value="D10" {% if station_code == 'D10' %}selected{% endif %}>Deanwood</option>
+                                    <option value="D11" {% if station_code == 'D11' %}selected{% endif %}>Cheverly</option>
+                                    <option value="D12" {% if station_code == 'D12' %}selected{% endif %}>Landover</option>
+                                    <option value="D13" {% if station_code == 'D13' %}selected{% endif %}>New Carrollton</option>
+                                    <option value="K01" {% if station_code == 'K01' %}selected{% endif %}>East Falls Church</option>
+                                    <option value="K02" {% if station_code == 'K02' %}selected{% endif %}>West Falls Church</option>
+                                    <option value="K03" {% if station_code == 'K03' %}selected{% endif %}>Dunn Loring</option>
+                                    <option value="K04" {% if station_code == 'K04' %}selected{% endif %}>Vienna</option>
+                                    <option value="K05" {% if station_code == 'K05' %}selected{% endif %}>McLean</option>
+                                    <option value="K06" {% if station_code == 'K06' %}selected{% endif %}>Tysons</option>
+                                    <option value="K07" {% if station_code == 'K07' %}selected{% endif %}>Greensboro</option>
+                                    <option value="K08" {% if station_code == 'K08' %}selected{% endif %}>Spring Hill</option>
+                                    <option value="N01" {% if station_code == 'N01' %}selected{% endif %}>Wiehle-Reston East</option>
+                                    <option value="N02" {% if station_code == 'N02' %}selected{% endif %}>Reston Town Center</option>
+                                    <option value="N03" {% if station_code == 'N03' %}selected{% endif %}>Herndon</option>
+                                    <option value="N04" {% if station_code == 'N04' %}selected{% endif %}>Innovation Center</option>
+                                    <option value="N06" {% if station_code == 'N06' %}selected{% endif %}>Dulles Airport</option>
+                                    <option value="N08" {% if station_code == 'N08' %}selected{% endif %}>Loudoun Gateway</option>
+                                    <option value="N09" {% if station_code == 'N09' %}selected{% endif %}>Ashburn</option>
+                                </optgroup>
+                                <!-- Green/Yellow -->
+                                <optgroup label="Green/Yellow Lines">
+                                    <option value="E01" {% if station_code == 'E01' %}selected{% endif %}>Mt Vernon Square</option>
+                                    <option value="E02" {% if station_code == 'E02' %}selected{% endif %}>Shaw-Howard U</option>
+                                    <option value="E03" {% if station_code == 'E03' %}selected{% endif %}>U Street</option>
+                                    <option value="E04" {% if station_code == 'E04' %}selected{% endif %}>Columbia Heights</option>
+                                    <option value="E05" {% if station_code == 'E05' %}selected{% endif %}>Georgia Ave-Petworth</option>
+                                    <option value="E06" {% if station_code == 'E06' %}selected{% endif %}>Fort Totten</option>
+                                    <option value="E07" {% if station_code == 'E07' %}selected{% endif %}>West Hyattsville</option>
+                                    <option value="E08" {% if station_code == 'E08' %}selected{% endif %}>Prince George's Plaza</option>
+                                    <option value="E09" {% if station_code == 'E09' %}selected{% endif %}>College Park</option>
+                                    <option value="E10" {% if station_code == 'E10' %}selected{% endif %}>Greenbelt</option>
+                                    <option value="F01" {% if station_code == 'F01' %}selected{% endif %}>Gallery Place</option>
+                                    <option value="F02" {% if station_code == 'F02' %}selected{% endif %}>Archives</option>
+                                    <option value="F03" {% if station_code == 'F03' %}selected{% endif %}>L'Enfant Plaza</option>
+                                    <option value="F04" {% if station_code == 'F04' %}selected{% endif %}>Waterfront</option>
+                                    <option value="F05" {% if station_code == 'F05' %}selected{% endif %}>Navy Yard</option>
+                                    <option value="F06" {% if station_code == 'F06' %}selected{% endif %}>Anacostia</option>
+                                    <option value="F07" {% if station_code == 'F07' %}selected{% endif %}>Congress Heights</option>
+                                    <option value="F08" {% if station_code == 'F08' %}selected{% endif %}>Southern Avenue</option>
+                                    <option value="F09" {% if station_code == 'F09' %}selected{% endif %}>Naylor Road</option>
+                                    <option value="F10" {% if station_code == 'F10' %}selected{% endif %}>Suitland</option>
+                                    <option value="F11" {% if station_code == 'F11' %}selected{% endif %}>Branch Ave</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <h4>Metro Line Colors</h4>
+                    <div class="metro-line-colors">
+                        <div class="metro-line">
+                            <div class="line-color-swatch red-line"></div>
+                            <span>Red Line</span>
+                        </div>
+                        <div class="metro-line">
+                            <div class="line-color-swatch blue-line"></div>
+                            <span>Blue Line</span>
+                        </div>
+                        <div class="metro-line">
+                            <div class="line-color-swatch orange-line"></div>
+                            <span>Orange Line</span>
+                        </div>
+                        <div class="metro-line">
+                            <div class="line-color-swatch green-line"></div>
+                            <span>Green Line</span>
+                        </div>
+                        <div class="metro-line">
+                            <div class="line-color-swatch yellow-line"></div>
+                            <span>Yellow Line</span>
+                        </div>
+                        <div class="metro-line">
+                            <div class="line-color-swatch silver-line"></div>
+                            <span>Silver Line</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ensure at least one station is always selected
+        document.addEventListener('DOMContentLoaded', function() {
+            const stationSelectors = document.querySelectorAll('.station-selector');
+
+            // Form validation before submit
+            document.querySelector('form').addEventListener('submit', function(e) {
+                let hasStation = false;
+                stationSelectors.forEach(function(selector) {
+                    if (selector.value) {
+                        hasStation = true;
+                    }
+                });
+
+                if (!hasStation) {
+                    e.preventDefault();
+                    alert('Please select at least one Metro station.');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

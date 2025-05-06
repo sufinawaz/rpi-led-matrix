@@ -10,7 +10,8 @@
   "api_keys": {
     "openweathermap": "",
     "newsapi": "",
-    "finnhub": ""
+    "finnhub": "",
+    "wmata": "YOUR_WMATA_API_KEY_HERE"
   },
   "defaults": {
     "scroll_speed": 20,
@@ -19,7 +20,7 @@
     "color": [255, 255, 255]
   },
   "plugins": {
-    "enabled": ["clock", "weather", "prayer", "gif", "moon", "intro", "stock"],
+    "enabled": ["clock", "weather", "prayer", "gif", "moon", "intro", "stock", "wmata"],
     "default": "clock",
     "settings": {
       "weather": {
@@ -66,6 +67,21 @@
           [0, 191, 255],
           [255, 165, 0]
         ]
+      },
+      "wmata": {
+        "api_key": "",
+        "stations": ["A01", "C01"],
+        "update_interval": 30,
+        "display_mode": "alternating",
+        "show_station_name": true,
+        "line_colors": {
+          "RD": [255, 0, 0],
+          "BL": [0, 0, 255],
+          "OR": [255, 165, 0],
+          "SV": [192, 192, 192],
+          "GR": [0, 255, 0],
+          "YL": [255, 255, 0]
+        }
       }
     }
   }

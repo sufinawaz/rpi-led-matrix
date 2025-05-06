@@ -15,14 +15,9 @@ logger = logging.getLogger(__name__)
 class WmataPlugin(DisplayPlugin):
     """Plugin for displaying WMATA (DC Metro) train arrival times
 
-    Configuration options:
-        api_key (str): WMATA API key
-        stations (list): List of station codes to display (up to 2)
-        update_interval (int): How often to update train data in seconds
-        line_colors (dict): RGB color tuples for each train line
-        display_mode (str): Display mode - 'alternating' or 'combined'
-        show_station_name (bool): Whether to display the station name
-        max_trains (int): Maximum number of trains to display per station
+    Display is split into two halves (top and bottom) for two stations.
+    Each half shows circle with metro line color, line code (e.g., OR),
+    and scrolling station name with arrival times.
     """
 
     def __init__(self, matrix, config=None):
@@ -32,11 +27,9 @@ class WmataPlugin(DisplayPlugin):
 
         # Default configuration
         self.config.setdefault('api_key', '')
-        self.config.setdefault('stations', ['K04', 'C01'])  # Vienna (Orange) and Metro Center
-        self.config.setdefault('update_interval', 30)  # 30 seconds
-        self.config.setdefault('display_mode', 'alternating')  # 'alternating' or 'combined'
-        self.config.setdefault('show_station_name', True)
-        self.config.setdefault('max_trains', 3)  # Show up to 3 trains per station
+        self.config.setdefault('stations', ['K04', 'C01'])  # Vienna and Metro Center
+        self.config.setdefault('update_interval', 50)  # 50 seconds between API calls
+        self.config.setdefault('max_trains', 2)  # Show up to 2 trains per station
         self.config.setdefault('line_colors', {
             'RD': [255, 0, 0],      # Red
             'BL': [0, 0, 255],      # Blue
@@ -49,14 +42,23 @@ class WmataPlugin(DisplayPlugin):
         # Internal state
         self.last_update = 0
         self.train_data = {}
-        self.current_station_index = 0
-        self.station_display_time = 0
-        self.station_display_duration = 5  # Seconds to display each station
         self.current_display = None
+        self.scroll_position = 0
+        self.scroll_timer = 0
+        self.scroll_speed = 0.03  # 3x faster (0.1 / 3 = 0.03 seconds per pixel)
+        self.max_scroll_width = 200  # Maximum scroll width
+
+        # Variables to track scroll status
+        self.text_width = {}  # Store width of text for each station
+        self.station_text_images = {}  # Store rendered text images for each station
+
+        # Start scrolling from the right edge
+        self.start_from_right = True
 
         # Font loading
         self.font = graphics.Font()
         self.font_small = graphics.Font()
+        self.font_tiny = graphics.Font()  # Even smaller font for arrival times
 
         # Colors
         self.colors = {
@@ -70,6 +72,16 @@ class WmataPlugin(DisplayPlugin):
             'yellow': graphics.Color(255, 255, 0),
             'gray': graphics.Color(128, 128, 128),
             'error': graphics.Color(255, 0, 0)
+        }
+
+        # Short line code mapping
+        self.line_codes = {
+            'RD': 'RD',
+            'BL': 'BL',
+            'OR': 'OR',
+            'SV': 'SV',
+            'GR': 'GR',
+            'YL': 'YL',
         }
 
         # Station name mapping
@@ -177,14 +189,66 @@ class WmataPlugin(DisplayPlugin):
             'N12': 'Downtown Largo'
         }
 
+        # Station to line mapping (manually defined)
+        self.station_lines = {
+            # Red Line
+            'A01': 'RD', 'A02': 'RD', 'A03': 'RD', 'A04': 'RD', 'A05': 'RD',
+            'A06': 'RD', 'A07': 'RD', 'A08': 'RD', 'A09': 'RD', 'A10': 'RD',
+            'A11': 'RD', 'A12': 'RD', 'A13': 'RD', 'A14': 'RD', 'A15': 'RD',
+            'B01': 'RD', 'B02': 'RD', 'B03': 'RD', 'B04': 'RD', 'B05': 'RD',
+            'B06': 'RD', 'B07': 'RD', 'B08': 'RD', 'B09': 'RD', 'B10': 'RD', 'B11': 'RD',
+
+            # Blue Line
+            'C01': 'BL', 'C02': 'BL', 'C03': 'BL', 'C04': 'BL', 'C05': 'BL',
+            'C06': 'BL', 'C07': 'BL', 'C08': 'BL', 'C09': 'BL', 'C10': 'BL',
+            'C11': 'BL', 'C12': 'BL', 'C13': 'BL', 'C14': 'BL', 'C15': 'BL',
+
+            # Orange Line
+            'D01': 'OR', 'D02': 'OR', 'D03': 'OR', 'D04': 'OR', 'D05': 'OR',
+            'D06': 'OR', 'D07': 'OR', 'D08': 'OR', 'D09': 'OR', 'D10': 'OR',
+            'D11': 'OR', 'D12': 'OR', 'D13': 'OR', 
+            'K01': 'OR', 'K02': 'OR', 'K03': 'OR', 'K04': 'OR',
+
+            # Silver Line
+            'K05': 'SV', 'K06': 'SV', 'K07': 'SV', 'K08': 'SV',
+            'N01': 'SV', 'N02': 'SV', 'N03': 'SV', 'N04': 'SV',
+            'N06': 'SV', 'N08': 'SV', 'N09': 'SV', 'N10': 'SV',
+
+            # Green Line
+            'E01': 'GR', 'E02': 'GR', 'E03': 'GR', 'E04': 'GR', 'E05': 'GR',
+            'E06': 'GR', 'E07': 'GR', 'E08': 'GR', 'E09': 'GR', 'E10': 'GR',
+
+            # Yellow Line
+            'F01': 'YL', 'F02': 'YL', 'F03': 'YL', 'F04': 'YL', 'F05': 'YL',
+            'F06': 'YL', 'F07': 'YL', 'F08': 'YL', 'F09': 'YL', 'F10': 'YL', 'F11': 'YL',
+
+            # Stations that serve multiple lines - we'll set default colors for these
+            'J01': 'OR', 'J02': 'OR', 'J03': 'OR', 'J04': 'OR',  # These stations serve Orange and Silver but showing as Orange
+            'G01': 'BL', 'G02': 'BL', 'G03': 'BL', 'G04': 'BL', 'G05': 'BL'  # Silver/Blue line stations showing as Blue
+        }
+
     def setup(self):
         """Set up the WMATA plugin"""
         # Load fonts
         try:
-            self.font_small.LoadFont("resources/fonts/4x6.bdf")
-            self.font.LoadFont("resources/fonts/7x13.bdf") 
+            # Try loading non-bold versions first
+            self.font_tiny.LoadFont("resources/fonts/4x6.bdf")  # Smallest font for train times
+            self.font_small.LoadFont("resources/fonts/5x7.bdf")  # Small for station names
+            self.font.LoadFont("resources/fonts/7x13.bdf")  # Regular for error messages
         except Exception as e:
             logger.error(f"Error loading fonts: {e}")
+            # If fonts fail to load, try system fonts or default
+            try:
+                self.font_tiny.LoadFont("/usr/share/fonts/misc/4x6.bdf")
+                self.font_small.LoadFont("/usr/share/fonts/misc/5x7.bdf")
+                self.font.LoadFont("/usr/share/fonts/misc/7x13.bdf")
+            except:
+                logger.error("Could not load system fonts either")
+                # As a fallback, use whatever fonts we can load
+                if not self.font_tiny.height:
+                    self.font_tiny = self.font_small
+                if not self.font_small.height:
+                    self.font_small = self.font
 
         # Check configuration
         logger.info(f"WMATA plugin configuration: {self.config}")
@@ -198,6 +262,10 @@ class WmataPlugin(DisplayPlugin):
             self.config['stations'] = self.config['stations'][:2]
             logger.info("Limited to 2 stations only")
 
+        # Ensure we have exactly 2 stations
+        while len(self.config.get('stations', [])) < 2:
+            self.config['stations'].append('C01')  # Add Metro Center as default
+
         # Initial data fetch
         self._fetch_train_data()
 
@@ -208,11 +276,14 @@ class WmataPlugin(DisplayPlugin):
             logger.error("No API key configured for WMATA data")
             return
 
-        # Get station codes to fetch (limited to 2)
-        stations = self.config.get('stations', [])[:2]
-        if not stations:
-            logger.error("No stations configured")
-            return
+        # Get station codes to fetch (exactly 2)
+        stations = self.config.get('stations', [])
+        if len(stations) != 2:
+            logger.warning(f"Expected exactly 2 stations, got {len(stations)}")
+            # Ensure we have exactly 2 stations
+            while len(stations) < 2:
+                stations.append('C01')  # Add Metro Center as default
+            stations = stations[:2]  # Limit to 2
 
         for station_code in stations:
             # WMATA API endpoint for real-time train predictions
@@ -225,12 +296,11 @@ class WmataPlugin(DisplayPlugin):
 
             try:
                 response = requests.get(url, headers=headers, timeout=10)
-
-                # Log response status
                 logger.info(f"API response status for {station_code}: {response.status_code}")
 
                 if response.status_code != 200:
                     logger.error(f"API error for {station_code}: HTTP {response.status_code}")
+                    self.train_data[station_code] = {"error": f"HTTP {response.status_code}"}
                     continue
 
                 data = response.json()
@@ -238,27 +308,35 @@ class WmataPlugin(DisplayPlugin):
 
                 if not trains:
                     logger.warning(f"No trains found for station {station_code}")
-                    self.train_data[station_code] = []
+                    self.train_data[station_code] = {"trains": []}
                     continue
 
                 # Process and sort train predictions
                 processed_trains = []
                 for train in trains:
-                    # Skip trains with no information or that aren't boarding
+                    # Get train information
+                    line = train.get('Line', '')
+
+                    # Skip destination as requested
+
+                    # Process minutes
                     if train.get('Min', '') == 'BRD':
                         minutes = 0
+                        min_display = "BRD"
                     elif train.get('Min', '') == 'ARR':
                         minutes = 0
+                        min_display = "ARR"
                     elif train.get('Min', '').isdigit():
                         minutes = int(train.get('Min', ''))
+                        min_display = f"{minutes}m"
                     else:
                         # Skip trains with no arrival information
                         continue
 
                     processed_trains.append({
-                        'line': train.get('Line', ''),
-                        'destination': train.get('Destination', ''),
+                        'line': line,
                         'minutes': minutes,
+                        'min_display': min_display,
                         'cars': train.get('Car', '')
                     })
 
@@ -266,242 +344,233 @@ class WmataPlugin(DisplayPlugin):
                 processed_trains.sort(key=lambda x: x['minutes'])
 
                 # Store data - limit to max_trains per station
-                max_trains = self.config.get('max_trains', 3)
-                self.train_data[station_code] = processed_trains[:max_trains]
-                logger.info(f"Successfully fetched {len(processed_trains)} trains for {station_code}")
+                max_trains = self.config.get('max_trains', 2)
+                self.train_data[station_code] = {
+                    "name": self.station_names.get(station_code, station_code),
+                    "trains": processed_trains[:max_trains]
+                }
+
+                logger.info(f"Got {len(processed_trains)} trains for {station_code}")
 
             except Exception as e:
                 logger.error(f"Error fetching data for station {station_code}: {e}")
+                self.train_data[station_code] = {"error": str(e)}
 
-        # Create display image
-        self._create_display_image()
+        # Prepare the text images for each station
+        self._prepare_text_images()
+
+        # Reset scrolling when new data arrives
+        self.scroll_position = 0
+        if self.start_from_right:
+            # Start from the right edge
+            self.scroll_position = self.matrix.width
+
+        # Create the initial display
+        self._create_split_screen_display()
+
+        # Reset update timer
         self.last_update = 0
 
-    def _create_display_image(self):
-        """Create the display image for the current station"""
-        # Get current station to display
-        if self.config.get('display_mode') == 'alternating':
-            stations = self.config.get('stations', [])
-            if not stations:
-                return
-
-            station_code = stations[self.current_station_index % len(stations)]
-            self._create_cube_style_display(station_code)
-        else:
-            # Combined mode - show all stations
-            self._create_combined_cube_display()
-
-    def _create_cube_style_display(self, station_code):
-        """Create a Cube-style display for a single station"""
-        # Create a new image for the display
+    def _prepare_text_images(self):
+        """Pre-render text images for each station and calculate their width"""
+        # Get matrix dimensions
         width = self.matrix.width
-        height = self.matrix.height
-        image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
+        half_height = self.matrix.height // 2
 
-        # Get station name
-        station_name = self.station_names.get(station_code, station_code)
+        # Left section width for line circle
+        left_width = 16
 
-        # Get train data for this station
-        trains = self.train_data.get(station_code, [])
-
-        # Draw station name at top with black background
-        draw.rectangle([(0, 0), (width, 9)], fill=(0, 0, 0))
-
-        # Draw station name - make it more prominent
-        if len(station_name) > 12 and width <= 32:
-            station_name = station_name[:11] + '.'
-
-        # Calculate position to center text
-        name_width = len(station_name) * 4  # Approximate width for small font
-        name_x = max(0, (width - name_width) // 2)
-
-        # Draw station name in white text
-        draw.text((name_x, 1), station_name.upper(), fill=(255, 255, 255))
-
-        # Horizontal line separator
-        draw.line([(0, 10), (width, 10)], fill=(40, 40, 40), width=1)
-
-        if not trains:
-            # No trains - display message centered
-            message = "No trains"
-            msg_width = len(message) * 6  # Approximate width
-            msg_x = max(0, (width - msg_width) // 2)
-            msg_y = max(0, (height - 7) // 2) 
-            draw.text((msg_x, msg_y), message, fill=(255, 0, 0))
-        else:
-            # Display trains using Cube-style layout
-            # Each train gets a row with colored circle for line, destination and minutes
-            y_pos = 13  # Start below the header
-
-            for i, train in enumerate(trains):
-                if i >= self.config.get('max_trains', 3):
-                    break  # Limit display to max_trains
-
-                # Get line color
-                line = train.get('line', '')
-                line_rgb = self.config.get('line_colors', {}).get(line, [255, 255, 255])
-
-                # Draw colored circle for train line - make it more prominent
-                circle_x, circle_y = 4, y_pos + 4
-                circle_radius = 4
-                draw.ellipse(
-                    [(circle_x - circle_radius, circle_y - circle_radius), 
-                     (circle_x + circle_radius, circle_y + circle_radius)], 
-                    fill=tuple(line_rgb)
-                )
-
-                # Draw destination - truncate if too long
-                dest = train.get('destination', '')
-                if len(dest) > 8 and width <= 32:
-                    dest = dest[:7] + '.'
-
-                # Draw destination in bright white
-                draw.text((10, y_pos), dest, fill=(255, 255, 255))
-
-                # Draw minutes
-                minutes = train.get('minutes')
-                if minutes == 0:
-                    min_text = "ARR"
-                else:
-                    min_text = f"{minutes}m"
-
-                # Right-align minutes text with large, bold visual style
-                min_width = len(min_text) * 5  # Make it wider for prominence
-                min_x = width - min_width - 2
-
-                # Draw minutes in bright color based on wait time
-                if minutes == 0:
-                    min_color = (255, 165, 0)  # Orange for arriving
-                elif minutes <= 5:
-                    min_color = (0, 255, 0)  # Green for soon
-                else:
-                    min_color = (255, 255, 255)  # White for longer waits
-
-                draw.text((min_x, y_pos), min_text, fill=min_color)
-
-                # Move to next position - add more space between rows
-                y_pos += 10
-
-        # Store the display
-        self.current_display = image
-
-    def _create_combined_cube_display(self):
-        """Create a Cube-style display showing trains from multiple stations"""
-        # Create a new image for the display
-        width = self.matrix.width
-        height = self.matrix.height
-        image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        # Get all stations (limited to 2)
+        # Get station codes
         stations = self.config.get('stations', [])[:2]
-        if not stations:
+
+        for station_code in stations:
+            # Get station data
+            station_data = self.train_data.get(station_code, {})
+            station_name = station_data.get("name", self.station_names.get(station_code, station_code))
+            trains = station_data.get("trains", [])
+
+            # Create a wider image to hold the text
+            # Make it 3x wider to ensure full passes are visible
+            text_image = Image.new('RGB', (width * 3, half_height), (0, 0, 0))
+            text_draw = ImageDraw.Draw(text_image)
+
+            # Draw station name and arrival times
+            if not trains:
+                # No trains case
+                text_draw.text((0, 0), station_name, fill=(255, 255, 255))
+
+                if "error" in station_data:
+                    text_draw.text((0, 8), "API Error", fill=(255, 0, 0))
+                else:
+                    text_draw.text((0, 8), "No trains", fill=(150, 150, 150))
+
+                # Store a default width
+                self.text_width[station_code] = len(station_name) * 6  # Rough estimate
+
+            else:
+                # Draw station name (moved up 2 pixels)
+                text_draw.text((0, 0), station_name, fill=(255, 255, 255))
+
+                # Format train arrival times - just times, no destinations
+                train_info = ""
+                for i, train in enumerate(trains):
+                    if i > 0:
+                        train_info += " - "  # Use dash separator
+
+                    min_display = train.get('min_display', '')
+                    train_info += min_display
+
+                # Determine color based on time
+                minutes = trains[0].get('minutes', 999)
+                if minutes == 0:
+                    info_color = (255, 165, 0)  # Orange for arriving/boarding
+                elif minutes <= 5:
+                    info_color = (0, 255, 0)  # Green for soon
+                else:
+                    info_color = (255, 255, 255)  # White for longer times
+
+                # Draw train info (using smaller font)
+                text_draw.text((0, 8), train_info, fill=info_color)
+
+                # Estimate the text width based on string length
+                # This is approximation, ideally we'd measure the rendered text
+                name_width = len(station_name) * 6  # Approximate width
+                times_width = len(train_info) * 4  # Approximate width
+                self.text_width[station_code] = max(name_width, times_width)
+
+            # Store the text image
+            self.station_text_images[station_code] = text_image
+
+            # Ensure the text is wide enough to make complete passes
+            # Make text appear 3 times in the image with gaps
+            text_width = self.text_width[station_code]
+            if text_width > 0:
+                # Draw the text again twice more with spacing
+                text_draw.text((text_width + 20, 0), station_name, fill=(255, 255, 255))
+                text_draw.text((2 * text_width + 40, 0), station_name, fill=(255, 255, 255))
+
+                if trains:
+                    text_draw.text((text_width + 20, 8), train_info, fill=info_color)
+                    text_draw.text((2 * text_width + 40, 8), train_info, fill=info_color)
+
+    def _create_split_screen_display(self):
+        """Create a display with split screen for two stations"""
+        # Create a new image for the display
+        width = self.matrix.width
+        height = self.matrix.height
+        display_image = Image.new('RGB', (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(display_image)
+
+        # Get station codes
+        stations = self.config.get('stations', [])[:2]
+
+        # Draw each station in its half (top and bottom)
+        for i, station_code in enumerate(stations):
+            half_height = height // 2
+            y_offset = i * half_height  # 0 for top half, half_height for bottom half
+
+            # Draw station info in this half
+            self._draw_station_half(draw, display_image, width, half_height, y_offset, station_code)
+
+        # Store the complete display
+        self.current_display = display_image
+
+    def _draw_station_half(self, draw, display_image, width, half_height, y_offset, station_code):
+        """Draw a single station info in its half of the screen"""
+        # Get station data
+        station_data = self.train_data.get(station_code, {})
+
+        # Left section: 16x16 pixels for line circle and code
+        left_width = 16
+
+        # Determine line color for the station
+        primary_line = self.station_lines.get(station_code, "RD")  # Default to Red if unknown
+        line_color = tuple(self.config.get('line_colors', {}).get(primary_line, [255, 255, 255]))
+        line_code = self.line_codes.get(primary_line, primary_line)
+
+        # Draw colored circle with line code
+        circle_x, circle_y = left_width // 2, y_offset + half_height // 2
+        circle_radius = 7
+        draw.ellipse(
+            [(circle_x - circle_radius, circle_y - circle_radius),
+             (circle_x + circle_radius, circle_y + circle_radius)],
+            fill=line_color
+        )
+
+        # Draw line code inside circle
+        code_x = circle_x - len(line_code) * 2  # Center text in circle
+        code_y = circle_y - 3  # Vertical center
+        draw.text((code_x, code_y), line_code, fill=(0, 0, 0))  # Black text
+
+        # Get the text image for this station
+        text_image = self.station_text_images.get(station_code)
+        if not text_image:
+            # If no text image, show basic error
+            draw.text((left_width + 1, y_offset), "No data", fill=(255, 0, 0))
             return
 
-        # Draw header "METRO"
-        header = "METRO"
-        header_width = len(header) * 5  # Wider for emphasis
-        header_x = max(0, (width - header_width) // 2)
-        draw.text((header_x, 1), header, fill=(255, 255, 255))
+        # Create a mask for the right section to prevent overlap with circle
+        mask = Image.new('1', (width, half_height), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.rectangle([(left_width, 0), (width, half_height)], fill=1)
 
-        # Horizontal separator line
-        draw.line([(0, 10), (width, 10)], fill=(40, 40, 40), width=1)
+        # Calculate the position to show in the scrolling text
+        max_text_width = width - left_width
+        text_width = self.text_width.get(station_code, max_text_width)
 
-        # Start display below header
-        y_pos = 13
+        # Determine scroll position
+        # Ensure we don't leave empty space when scrolling
+        display_pos = self.scroll_position
+        if self.start_from_right and display_pos > text_width:
+            # Reset scrolling sooner if text is shorter than the screen width
+            display_pos = display_pos % (text_width + max_text_width)
 
-        # Display one station at a time, Cube style
-        for station_index, station_code in enumerate(stations):
-            if station_index > 0:
-                # Add separator between stations
-                draw.line([(0, y_pos - 1), (width, y_pos - 1)], fill=(30, 30, 30), width=1)
-                y_pos += 2
-
-            # Get station name (abbreviated)
-            station_name = self.station_names.get(station_code, station_code)
-            if len(station_name) > 10:
-                station_name = station_name[:9] + '.'
-
-            # Draw station name in a lighter color to differentiate
-            draw.text((2, y_pos), station_name, fill=(180, 180, 180))
-            y_pos += 7
-
-            # Get train data
-            trains = self.train_data.get(station_code, [])
-
-            if not trains:
-                # No trains for this station
-                draw.text((4, y_pos), "No trains", fill=(150, 150, 150))
-                y_pos += 7
-            else:
-                # Show up to 2 trains per station in combined view
-                for i, train in enumerate(trains[:2]):
-                    # Get line color
-                    line = train.get('line', '')
-                    line_rgb = self.config.get('line_colors', {}).get(line, [255, 255, 255])
-
-                    # Draw colored circle for train line
-                    circle_x, circle_y = 4, y_pos + 3
-                    circle_radius = 3
-                    draw.ellipse(
-                        [(circle_x - circle_radius, circle_y - circle_radius), 
-                         (circle_x + circle_radius, circle_y + circle_radius)], 
-                        fill=tuple(line_rgb)
-                    )
-
-                    # Draw minutes
-                    minutes = train.get('minutes')
-                    if minutes == 0:
-                        min_text = "ARR"
-                    else:
-                        min_text = f"{minutes}m"
-
-                    # Right-align minutes with color based on wait time
-                    min_width = len(min_text) * 4
-                    min_x = width - min_width - 2
-
-                    if minutes == 0:
-                        min_color = (255, 165, 0)  # Orange for arriving
-                    elif minutes <= 5:
-                        min_color = (0, 255, 0)  # Green for soon
-                    else:
-                        min_color = (255, 255, 255)  # White for longer waits
-
-                    # For combined view, show destination more compactly
-                    dest = train.get('destination', '')
-                    if len(dest) > 6:
-                        dest = dest[:5] + '.'
-
-                    # Draw destination between line and minutes
-                    draw.text((10, y_pos), dest, fill=(255, 255, 255))
-                    draw.text((min_x, y_pos), min_text, fill=min_color)
-
-                    y_pos += 7
-
-            # Add space before next station
-            y_pos += 1
-
-        # Store the display
-        self.current_display = image
+        # Paste the scrolling text onto the main image using the mask
+        # This ensures text only appears in the right section
+        display_image.paste(
+            text_image.crop((display_pos, 0, display_pos + max_text_width, half_height)),
+            (left_width, y_offset), 
+            mask.crop((left_width, 0, width, half_height))
+        )
 
     def update(self, delta_time):
         """Update WMATA display"""
         # Update timers
         self.last_update += delta_time
-        self.station_display_time += delta_time
 
         # Update train data based on interval
         if self.last_update >= self.config['update_interval']:
             self._fetch_train_data()
-            self.last_update = 0
 
-        # Update station display in alternating mode
-        if self.config.get('display_mode') == 'alternating':
-            if self.station_display_time >= self.station_display_duration:
-                self.station_display_time = 0
-                self.current_station_index += 1
-                self._create_display_image()
+        # Handle scrolling
+        self.scroll_timer += delta_time
+        if self.scroll_timer >= self.scroll_speed:
+            self.scroll_timer = 0
+
+            # Update scroll position
+            if self.start_from_right:
+                # Scrolling from right to left (decreasing positions)
+                self.scroll_position -= 1
+
+                # Calculate when to reset based on the text width
+                # Use the maximum width of text among all stations
+                if self.text_width:
+                    max_text_width = max(self.text_width.values())
+
+                    # When to restart - set a negative limit to ensure complete passes
+                    if self.scroll_position < -max_text_width:
+                        # Restart from right edge
+                        self.scroll_position = self.matrix.width
+            else:
+                # Original behavior - scrolling from left to right (increasing positions)
+                self.scroll_position += 1
+
+                # Reset after max width
+                if self.scroll_position > self.max_scroll_width:
+                    self.scroll_position = 0
+
+            # Update display with new scroll position
+            self._create_split_screen_display()
 
     def render(self, canvas):
         """Render the WMATA display"""

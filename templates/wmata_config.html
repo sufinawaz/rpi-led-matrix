@@ -178,20 +178,6 @@
             gap: 5px;
         }
 
-        .radio-group {
-            display: flex;
-            gap: 15px;
-        }
-
-        .radio-option {
-            display: flex;
-            align-items: center;
-        }
-
-        .radio-option input {
-            margin-right: 5px;
-        }
-
         .description {
             color: #6c757d;
             font-size: 0.9rem;
@@ -211,27 +197,7 @@
             border-radius: 4px;
         }
 
-        .metro-line-colors {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .metro-line {
-            display: flex;
-            align-items: center;
-            margin-right: 15px;
-        }
-
-        .line-color-swatch {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
-
-        .cube-preview {
+        .tidbyt-preview {
             margin: 20px 0;
             background: #000;
             padding: 15px;
@@ -239,7 +205,7 @@
             max-width: 300px;
         }
 
-        .cube-preview img {
+        .tidbyt-preview img {
             width: 100%;
             height: auto;
         }
@@ -260,15 +226,15 @@
         </a>
 
         <h1>Configure WMATA Plugin</h1>
-        <p class="description">Display real-time DC Metro train arrival information on your InfoCube in a Cube-style format.</p>
+        <p class="description">Display real-time DC Metro train arrival information on your InfoCube in a split-screen layout.</p>
 
         <div class="card">
             <div class="card-header">
                 <h3>WMATA Settings</h3>
             </div>
             <div class="card-body">
-                <div class="cube-preview">
-                    <img src="https://i.imgur.com/JNLgqx8.png" alt="Cube-style Metro Display" />
+                <div class="tidbyt-preview">
+                    <img src="https://i.imgur.com/JNLgqx8.png" alt="Split-screen Metro Display" />
                     <p style="color: white; text-align: center; margin-top: 10px;">Example Display</p>
                 </div>
 
@@ -283,20 +249,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Display Mode</label>
-                        <div class="radio-group">
-                            <div class="radio-option">
-                                <input type="radio" id="mode_alternating" name="display_mode" value="alternating" {% if plugin_config.get('display_mode') == 'alternating' %}checked{% endif %}>
-                                <label for="mode_alternating">Alternating (rotate between stations)</label>
-                            </div>
-                            <div class="radio-option">
-                                <input type="radio" id="mode_combined" name="display_mode" value="combined" {% if plugin_config.get('display_mode') == 'combined' %}checked{% endif %}>
-                                <label for="mode_combined">Combined (all stations at once)</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
                         <label for="update_interval">Update Interval (seconds)</label>
                         <input type="number" class="form-control" id="update_interval" name="update_interval" value="{{ plugin_config.get('update_interval', 30) }}" min="30">
                         <small class="form-text text-muted">How often to update train data. Minimum 30 seconds recommended.</small>
@@ -304,19 +256,12 @@
 
                     <div class="form-group">
                         <label for="max_trains">Maximum Trains Per Station</label>
-                        <input type="number" class="form-control" id="max_trains" name="max_trains" value="{{ plugin_config.get('max_trains', 3) }}" min="1" max="5">
+                        <input type="number" class="form-control" id="max_trains" name="max_trains" value="{{ plugin_config.get('max_trains', 2) }}" min="1" max="5">
                         <small class="form-text text-muted">Maximum number of trains to display per station (1-5).</small>
                     </div>
 
-                    <div class="form-group">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="show_station_name" name="show_station_name" {% if plugin_config.get('show_station_name', True) %}checked{% endif %}>
-                            <label class="form-check-label" for="show_station_name">Show Station Names</label>
-                        </div>
-                    </div>
-
                     <h4>Metro Stations</h4>
-                    <p class="description">Configure up to 2 Metro stations to display (only 2 will be used)</p>
+                    <p class="description">Configure exactly 2 Metro stations to display in split-screen layout</p>
 
                     <div class="station-items">
                         {% for i in range(2) %}
@@ -355,8 +300,8 @@
                                     <option value="B10" {% if station_code == 'B10' %}selected{% endif %}>Wheaton</option>
                                     <option value="B11" {% if station_code == 'B11' %}selected{% endif %}>Glenmont</option>
                                 </optgroup>
-                                <!-- Blue/Orange/Silver -->
-                                <optgroup label="Blue/Orange/Silver Lines">
+                                <!-- Blue Line -->
+                                <optgroup label="Blue Line">
                                     <option value="C01" {% if station_code == 'C01' %}selected{% endif %}>Metro Center</option>
                                     <option value="C02" {% if station_code == 'C02' %}selected{% endif %}>McPherson Square</option>
                                     <option value="C03" {% if station_code == 'C03' %}selected{% endif %}>Farragut West</option>
@@ -372,6 +317,9 @@
                                     <option value="C13" {% if station_code == 'C13' %}selected{% endif %}>King St-Old Town</option>
                                     <option value="C14" {% if station_code == 'C14' %}selected{% endif %}>Eisenhower Ave</option>
                                     <option value="C15" {% if station_code == 'C15' %}selected{% endif %}>Huntington</option>
+                                </optgroup>
+                                <!-- Orange Line -->
+                                <optgroup label="Orange Line">
                                     <option value="D01" {% if station_code == 'D01' %}selected{% endif %}>Federal Triangle</option>
                                     <option value="D02" {% if station_code == 'D02' %}selected{% endif %}>Smithsonian</option>
                                     <option value="D03" {% if station_code == 'D03' %}selected{% endif %}>L'Enfant Plaza</option>
@@ -389,6 +337,9 @@
                                     <option value="K02" {% if station_code == 'K02' %}selected{% endif %}>West Falls Church</option>
                                     <option value="K03" {% if station_code == 'K03' %}selected{% endif %}>Dunn Loring</option>
                                     <option value="K04" {% if station_code == 'K04' %}selected{% endif %}>Vienna</option>
+                                </optgroup>
+                                <!-- Silver Line -->
+                                <optgroup label="Silver Line">
                                     <option value="K05" {% if station_code == 'K05' %}selected{% endif %}>McLean</option>
                                     <option value="K06" {% if station_code == 'K06' %}selected{% endif %}>Tysons</option>
                                     <option value="K07" {% if station_code == 'K07' %}selected{% endif %}>Greensboro</option>
@@ -401,8 +352,8 @@
                                     <option value="N08" {% if station_code == 'N08' %}selected{% endif %}>Loudoun Gateway</option>
                                     <option value="N09" {% if station_code == 'N09' %}selected{% endif %}>Ashburn</option>
                                 </optgroup>
-                                <!-- Green/Yellow -->
-                                <optgroup label="Green/Yellow Lines">
+                                <!-- Green Line -->
+                                <optgroup label="Green Line">
                                     <option value="E01" {% if station_code == 'E01' %}selected{% endif %}>Mt Vernon Square</option>
                                     <option value="E02" {% if station_code == 'E02' %}selected{% endif %}>Shaw-Howard U</option>
                                     <option value="E03" {% if station_code == 'E03' %}selected{% endif %}>U Street</option>
@@ -413,6 +364,9 @@
                                     <option value="E08" {% if station_code == 'E08' %}selected{% endif %}>Prince George's Plaza</option>
                                     <option value="E09" {% if station_code == 'E09' %}selected{% endif %}>College Park</option>
                                     <option value="E10" {% if station_code == 'E10' %}selected{% endif %}>Greenbelt</option>
+                                </optgroup>
+                                <!-- Yellow Line -->
+                                <optgroup label="Yellow Line">
                                     <option value="F01" {% if station_code == 'F01' %}selected{% endif %}>Gallery Place</option>
                                     <option value="F02" {% if station_code == 'F02' %}selected{% endif %}>Archives</option>
                                     <option value="F03" {% if station_code == 'F03' %}selected{% endif %}>L'Enfant Plaza</option>

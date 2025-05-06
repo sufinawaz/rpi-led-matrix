@@ -127,8 +127,6 @@ class ConfigManager:
             return self.config.get(section, default)
 
         section_data = self.config.get(section, {})
-        print(f"section_data type: {type(section_data)}")
-        print(f"section_data content: {section_data}")
 
         if isinstance(section_data, dict):
             try:

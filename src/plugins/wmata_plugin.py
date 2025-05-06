@@ -45,7 +45,7 @@ class WmataPlugin(DisplayPlugin):
         self.current_display = None
         self.scroll_position = 0
         self.scroll_timer = 0
-        self.scroll_speed = 0.03  # 3x faster (0.1 / 3 = 0.03 seconds per pixel)
+        self.scroll_speed = 0.06
 
         # Text width and image storage
         self.station_name_width = {}  # Width of each station name in pixels
@@ -413,7 +413,7 @@ class WmataPlugin(DisplayPlugin):
         # Draw a medium gray line in the middle to separate the two stations
         separator_y = height // 2
         for x in range(width):
-            display_image.putpixel((x, separator_y), (100, 100, 100))  # Medium gray color
+            display_image.putpixel((x, separator_y), (60, 60, 60))  # Medium gray color
 
         # Store the complete display
         self.current_display = display_image

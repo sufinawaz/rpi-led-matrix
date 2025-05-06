@@ -46,19 +46,20 @@ class WmataPlugin(DisplayPlugin):
         self.scroll_position = 0
         self.scroll_timer = 0
         self.scroll_speed = 0.03  # 3x faster (0.1 / 3 = 0.03 seconds per pixel)
-        self.max_scroll_width = 200  # Maximum scroll width
 
-        # Variables to track scroll status
-        self.text_width = {}  # Store width of text for each station
-        self.station_text_images = {}  # Store rendered text images for each station
+        # Text width and image storage
+        self.station_name_width = {}  # Width of each station name in pixels
+        self.should_scroll = {}  # Whether a station name needs scrolling
+        self.scroll_amount = {}  # Total scroll amount needed for each station
 
-        # Start scrolling from the right edge
-        self.start_from_right = True
+        # Clock fonts (will try to get from imports in setup)
+        self.clock_font = None
+        self.temp_font = None
 
         # Font loading
         self.font = graphics.Font()
         self.font_small = graphics.Font()
-        self.font_tiny = graphics.Font()  # Even smaller font for arrival times
+        self.font_tiny = graphics.Font()
 
         # Colors
         self.colors = {
@@ -229,26 +230,53 @@ class WmataPlugin(DisplayPlugin):
 
     def setup(self):
         """Set up the WMATA plugin"""
-        # Load fonts
-        try:
-            # Try loading non-bold versions first
-            self.font_tiny.LoadFont("resources/fonts/4x6.bdf")  # Smallest font for train times
-            self.font_small.LoadFont("resources/fonts/5x7.bdf")  # Small for station names
-            self.font.LoadFont("resources/fonts/7x13.bdf")  # Regular for error messages
-        except Exception as e:
-            logger.error(f"Error loading fonts: {e}")
-            # If fonts fail to load, try system fonts or default
+        # Try to import fonts from other plugins for consistency
+        self._import_fonts_from_other_plugins()
+
+        # Load fonts if not imported from other plugins
+        if not self.clock_font:
             try:
-                self.font_tiny.LoadFont("/usr/share/fonts/misc/4x6.bdf")
-                self.font_small.LoadFont("/usr/share/fonts/misc/5x7.bdf")
-                self.font.LoadFont("/usr/share/fonts/misc/7x13.bdf")
-            except:
-                logger.error("Could not load system fonts either")
-                # As a fallback, use whatever fonts we can load
-                if not self.font_tiny.height:
-                    self.font_tiny = self.font_small
-                if not self.font_small.height:
-                    self.font_small = self.font
+                self.clock_font = graphics.Font()
+                self.clock_font.LoadFont("resources/fonts/7x13.bdf")  # Same as clock plugin
+            except Exception as e:
+                logger.error(f"Error loading clock font: {e}")
+                # Try system fonts
+                try:
+                    self.clock_font.LoadFont("/usr/share/fonts/misc/7x13.bdf")
+                except:
+                    # Fallback to default font
+                    self.font.LoadFont("resources/fonts/6x10.bdf")
+                    self.clock_font = self.font
+
+        if not self.temp_font:
+            try:
+                self.temp_font = graphics.Font()
+                self.temp_font.LoadFont("resources/fonts/5x7.bdf")  # Like temp display on clock
+            except Exception as e:
+                logger.error(f"Error loading temp font: {e}")
+                # Try system fonts
+                try:
+                    self.temp_font.LoadFont("/usr/share/fonts/misc/5x7.bdf")
+                except:
+                    # Fallback to smaller font
+                    self.font_small.LoadFont("resources/fonts/4x6.bdf")
+                    self.temp_font = self.font_small
+
+        # Additional fallback in case we still don't have fonts
+        if not self.clock_font.height or not self.temp_font.height:
+            # Simple fallbacks
+            if not self.font.height:
+                self.font.LoadFont("resources/fonts/6x10.bdf")
+            if not self.font_small.height:
+                self.font_small.LoadFont("resources/fonts/5x7.bdf")
+            if not self.font_tiny.height:
+                self.font_tiny.LoadFont("resources/fonts/4x6.bdf")
+
+            # Assign fallbacks if needed
+            if not self.clock_font.height:
+                self.clock_font = self.font
+            if not self.temp_font.height:
+                self.temp_font = self.font_small
 
         # Check configuration
         logger.info(f"WMATA plugin configuration: {self.config}")
@@ -268,6 +296,24 @@ class WmataPlugin(DisplayPlugin):
 
         # Initial data fetch
         self._fetch_train_data()
+
+    def _import_fonts_from_other_plugins(self):
+        """Try to import fonts from other plugins for consistency"""
+        try:
+            # Try to import clock plugin and get its fonts
+            from animations.clock import Clock
+            clock_instance = Clock(self.matrix)
+            if hasattr(clock_instance, 'font'):
+                self.clock_font = clock_instance.font
+                logger.info("Successfully imported clock font")
+
+            # Try to find a font similar to temp display
+            if hasattr(clock_instance, 'font_small'):
+                self.temp_font = clock_instance.font_small
+                logger.info("Successfully imported temperature font")
+        except Exception as e:
+            logger.error(f"Error importing fonts from clock plugin: {e}")
+            # Will fall back to loading fonts directly
 
     def _fetch_train_data(self):
         """Fetch train arrival predictions from WMATA API"""
@@ -356,14 +402,11 @@ class WmataPlugin(DisplayPlugin):
                 logger.error(f"Error fetching data for station {station_code}: {e}")
                 self.train_data[station_code] = {"error": str(e)}
 
-        # Prepare the text images for each station
-        self._prepare_text_images()
+        # Calculate text widths for each station name
+        self._calculate_name_widths()
 
         # Reset scrolling when new data arrives
         self.scroll_position = 0
-        if self.start_from_right:
-            # Start from the right edge
-            self.scroll_position = self.matrix.width
 
         # Create the initial display
         self._create_split_screen_display()
@@ -371,87 +414,36 @@ class WmataPlugin(DisplayPlugin):
         # Reset update timer
         self.last_update = 0
 
-    def _prepare_text_images(self):
-        """Pre-render text images for each station and calculate their width"""
-        # Get matrix dimensions
-        width = self.matrix.width
-        half_height = self.matrix.height // 2
-
-        # Left section width for line circle
-        left_width = 16
-
+    def _calculate_name_widths(self):
+        """Calculate the pixel width of each station name and determine if scrolling is needed"""
         # Get station codes
         stations = self.config.get('stations', [])[:2]
 
+        # Available width for name display (matrix width minus left section)
+        available_width = self.matrix.width - 16  # 16px for line circle
+
         for station_code in stations:
-            # Get station data
+            # Get station name
             station_data = self.train_data.get(station_code, {})
             station_name = station_data.get("name", self.station_names.get(station_code, station_code))
-            trains = station_data.get("trains", [])
 
-            # Create a wider image to hold the text
-            # Make it 3x wider to ensure full passes are visible
-            text_image = Image.new('RGB', (width * 3, half_height), (0, 0, 0))
-            text_draw = ImageDraw.Draw(text_image)
+            # Calculate approximate width based on character count and font
+            # The clock font is approximately 6-7 pixels per character
+            char_width = 7  # Pixels per character for the clock font
+            name_width = len(station_name) * char_width
 
-            # Draw station name and arrival times
-            if not trains:
-                # No trains case
-                text_draw.text((0, 0), station_name, fill=(255, 255, 255))
+            # Store the calculated width
+            self.station_name_width[station_code] = name_width
 
-                if "error" in station_data:
-                    text_draw.text((0, 8), "API Error", fill=(255, 0, 0))
-                else:
-                    text_draw.text((0, 8), "No trains", fill=(150, 150, 150))
+            # Determine if scrolling is needed (name longer than 7 characters / 48 pixels)
+            self.should_scroll[station_code] = name_width > available_width
 
-                # Store a default width
-                self.text_width[station_code] = len(station_name) * 6  # Rough estimate
-
+            # Calculate total scroll amount if scrolling is needed
+            if self.should_scroll[station_code]:
+                # Need to scroll the full width plus some padding
+                self.scroll_amount[station_code] = name_width + 10  # Add padding
             else:
-                # Draw station name (moved up 2 pixels)
-                text_draw.text((0, 0), station_name, fill=(255, 255, 255))
-
-                # Format train arrival times - just times, no destinations
-                train_info = ""
-                for i, train in enumerate(trains):
-                    if i > 0:
-                        train_info += " - "  # Use dash separator
-
-                    min_display = train.get('min_display', '')
-                    train_info += min_display
-
-                # Determine color based on time
-                minutes = trains[0].get('minutes', 999)
-                if minutes == 0:
-                    info_color = (255, 165, 0)  # Orange for arriving/boarding
-                elif minutes <= 5:
-                    info_color = (0, 255, 0)  # Green for soon
-                else:
-                    info_color = (255, 255, 255)  # White for longer times
-
-                # Draw train info (using smaller font)
-                text_draw.text((0, 8), train_info, fill=info_color)
-
-                # Estimate the text width based on string length
-                # This is approximation, ideally we'd measure the rendered text
-                name_width = len(station_name) * 6  # Approximate width
-                times_width = len(train_info) * 4  # Approximate width
-                self.text_width[station_code] = max(name_width, times_width)
-
-            # Store the text image
-            self.station_text_images[station_code] = text_image
-
-            # Ensure the text is wide enough to make complete passes
-            # Make text appear 3 times in the image with gaps
-            text_width = self.text_width[station_code]
-            if text_width > 0:
-                # Draw the text again twice more with spacing
-                text_draw.text((text_width + 20, 0), station_name, fill=(255, 255, 255))
-                text_draw.text((2 * text_width + 40, 0), station_name, fill=(255, 255, 255))
-
-                if trains:
-                    text_draw.text((text_width + 20, 8), train_info, fill=info_color)
-                    text_draw.text((2 * text_width + 40, 8), train_info, fill=info_color)
+                self.scroll_amount[station_code] = 0
 
     def _create_split_screen_display(self):
         """Create a display with split screen for two stations"""
@@ -479,6 +471,8 @@ class WmataPlugin(DisplayPlugin):
         """Draw a single station info in its half of the screen"""
         # Get station data
         station_data = self.train_data.get(station_code, {})
+        station_name = station_data.get("name", self.station_names.get(station_code, station_code))
+        trains = station_data.get("trains", [])
 
         # Left section: 16x16 pixels for line circle and code
         left_width = 16
@@ -502,36 +496,62 @@ class WmataPlugin(DisplayPlugin):
         code_y = circle_y - 3  # Vertical center
         draw.text((code_x, code_y), line_code, fill=(0, 0, 0))  # Black text
 
-        # Get the text image for this station
-        text_image = self.station_text_images.get(station_code)
-        if not text_image:
-            # If no text image, show basic error
-            draw.text((left_width + 1, y_offset), "No data", fill=(255, 0, 0))
-            return
+        # Create a PIL ImageDraw for the text section
+        text_image = Image.new('RGB', (width - left_width, half_height), (0, 0, 0))
+        text_draw = ImageDraw.Draw(text_image)
+
+        # Draw station name - either static or scrolling
+        if not self.should_scroll.get(station_code, False):
+            # Static display (name fits without scrolling)
+            text_draw.text((2, 0), station_name, fill=(255, 255, 255))
+        else:
+            # Scrolling display for long names
+            # Calculate position based on scroll_position
+            # We want the text to start fully off-screen to the right and scroll left
+            scroll_x = width - left_width - self.scroll_position
+            if scroll_x < -self.station_name_width[station_code]:
+                # Reset when the name has scrolled completely off the left
+                scroll_x = width - left_width
+
+            # We only draw the station name when it's at least partially visible
+            if scroll_x < width - left_width:
+                text_draw.text((scroll_x, 0), station_name, fill=(255, 255, 255))
+
+        # Draw arrival times (always static, never scrolling)
+        if not trains:
+            if "error" in station_data:
+                text_draw.text((2, 8), "API Error", fill=(255, 0, 0))
+            else:
+                text_draw.text((2, 8), "No trains", fill=(150, 150, 150))
+        else:
+            # Format train arrival times - just times, no destinations
+            train_info = ""
+            for i, train in enumerate(trains):
+                if i > 0:
+                    train_info += " - "  # Use dash separator
+
+                min_display = train.get('min_display', '')
+                train_info += min_display
+
+            # Determine color based on time
+            minutes = trains[0].get('minutes', 999)
+            if minutes == 0:
+                info_color = (255, 165, 0)  # Orange for arriving/boarding
+            elif minutes <= 5:
+                info_color = (0, 255, 0)  # Green for soon
+            else:
+                info_color = (255, 255, 255)  # White for longer times
+
+            # Draw train info with temperature font
+            text_draw.text((2, 8), train_info, fill=info_color)
 
         # Create a mask for the right section to prevent overlap with circle
         mask = Image.new('1', (width, half_height), 0)
         mask_draw = ImageDraw.Draw(mask)
         mask_draw.rectangle([(left_width, 0), (width, half_height)], fill=1)
 
-        # Calculate the position to show in the scrolling text
-        max_text_width = width - left_width
-        text_width = self.text_width.get(station_code, max_text_width)
-
-        # Determine scroll position
-        # Ensure we don't leave empty space when scrolling
-        display_pos = self.scroll_position
-        if self.start_from_right and display_pos > text_width:
-            # Reset scrolling sooner if text is shorter than the screen width
-            display_pos = display_pos % (text_width + max_text_width)
-
-        # Paste the scrolling text onto the main image using the mask
-        # This ensures text only appears in the right section
-        display_image.paste(
-            text_image.crop((display_pos, 0, display_pos + max_text_width, half_height)),
-            (left_width, y_offset), 
-            mask.crop((left_width, 0, width, half_height))
-        )
+        # Paste the text image onto the main display
+        display_image.paste(text_image, (left_width, y_offset), mask.crop((left_width, 0, width, half_height)))
 
     def update(self, delta_time):
         """Update WMATA display"""
@@ -541,33 +561,28 @@ class WmataPlugin(DisplayPlugin):
         # Update train data based on interval
         if self.last_update >= self.config['update_interval']:
             self._fetch_train_data()
+            return
+
+        # Check if any station needs scrolling
+        needs_scrolling = any(self.should_scroll.values())
+        if not needs_scrolling:
+            # No scrolling needed, skip the rest
+            return
 
         # Handle scrolling
         self.scroll_timer += delta_time
         if self.scroll_timer >= self.scroll_speed:
             self.scroll_timer = 0
 
-            # Update scroll position
-            if self.start_from_right:
-                # Scrolling from right to left (decreasing positions)
-                self.scroll_position -= 1
+            # Increment scroll position
+            self.scroll_position += 1
 
-                # Calculate when to reset based on the text width
-                # Use the maximum width of text among all stations
-                if self.text_width:
-                    max_text_width = max(self.text_width.values())
+            # Find max scroll amount needed
+            max_scroll = max(self.scroll_amount.values())
 
-                    # When to restart - set a negative limit to ensure complete passes
-                    if self.scroll_position < -max_text_width:
-                        # Restart from right edge
-                        self.scroll_position = self.matrix.width
-            else:
-                # Original behavior - scrolling from left to right (increasing positions)
-                self.scroll_position += 1
-
-                # Reset after max width
-                if self.scroll_position > self.max_scroll_width:
-                    self.scroll_position = 0
+            # Reset at the end of the longest scroll
+            if self.scroll_position > max_scroll:
+                self.scroll_position = 0
 
             # Update display with new scroll position
             self._create_split_screen_display()

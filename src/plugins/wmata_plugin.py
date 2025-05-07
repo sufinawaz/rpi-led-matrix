@@ -153,7 +153,7 @@ class WmataPlugin(DisplayPlugin):
                     "/usr/share/fonts/TTF/DejaVuSans.ttf",
                     "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf"
                 ]
-                
+
                 for path in font_paths:
                     if os.path.exists(path):
                         self.pil_font = ImageFont.truetype(path, 8)

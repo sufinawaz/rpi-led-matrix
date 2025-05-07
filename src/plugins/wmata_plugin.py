@@ -404,28 +404,57 @@ class WmataPlugin(DisplayPlugin):
     def _draw_station_name(self, text_draw, station_code, station_name, width, left_width):
         """Draw the station name (either static or scrolling)"""
         if not self.should_scroll.get(station_code, False):
-            # Static display
-            text_draw.text((2, -1), station_name, fill=(255, 255, 255))
+            # Static display - draw character by character with 1px spacing
+            x_pos = 2
+            for char in station_name:
+                text_draw.text((x_pos, -1), char, fill=(255, 255, 255))
+                # Move position based on character (narrower for i, l, etc.)
+                if char in 'il.,\'':
+                    x_pos += 2  # Narrow characters
+                elif char in 'mw':
+                    x_pos += 5  # Wide characters
+                else:
+                    x_pos += 4  # Normal characters
         else:
             # Scrolling display
-            scroll_x = width - left_width - self.scroll_position + 10
+            scroll_x = width - left_width - self.scroll_position
 
-            # Reset when scrolled off screen
+            # Reset when scrolled far off screen
             if scroll_x < -self.station_name_width[station_code] - 100:
                 scroll_x = width - left_width
 
             # Draw only when visible
             if scroll_x < width - left_width:
-                text_draw.text((scroll_x, 0), station_name, fill=(255, 255, 255))
+                # Draw character by character with custom spacing
+                x_pos = scroll_x
+                for char in station_name:
+                    text_draw.text((x_pos, 0), char, fill=(255, 255, 255))
+                    # Move position based on character (narrower for i, l, etc.)
+                    if char in 'il.,\'':
+                        x_pos += 2  # Narrow characters
+                    elif char in 'mw':
+                        x_pos += 5  # Wide characters
+                    else:
+                        x_pos += 4  # Normal characters
 
     def _draw_train_times(self, text_draw, station_data, trains):
         """Draw the train arrival times"""
         if not trains:
             # No trains or error
             if "error" in station_data:
-                text_draw.text((2, 8), "API Error", font=self.pil_font_small, fill=(255, 0, 0))
+                # Draw "API Error" character by character
+                error_text = "API Error"
+                x_pos = 2
+                for char in error_text:
+                    text_draw.text((x_pos, 8), char, fill=(255, 0, 0))
+                    x_pos += 4
             else:
-                text_draw.text((2, 8), "No trains", font=self.pil_font_small, fill=(150, 150, 150))
+                # Draw "No trains" character by character
+                no_trains_text = "No trains"
+                x_pos = 2
+                for char in no_trains_text:
+                    text_draw.text((x_pos, 8), char, fill=(150, 150, 150))
+                    x_pos += 4
             return
 
         # Format arrival times
@@ -440,8 +469,17 @@ class WmataPlugin(DisplayPlugin):
         else:
             info_color = (255, 255, 255)  # White for longer times
 
-        # Draw train info with specified font
-        text_draw.text((2, 7), train_info, font=self.pil_font_small, fill=info_color)
+        # Draw train info character by character
+        x_pos = 2
+        for char in train_info:
+            text_draw.text((x_pos, 8), char, fill=info_color)
+            # Move position based on character
+            if char in 'il.,\'':
+                x_pos += 2  # Narrow characters
+            elif char in 'mw':
+                x_pos += 5  # Wide characters
+            else:
+                x_pos += 4  # Normal characters
 
     def update(self, delta_time):
         """Update WMATA display"""

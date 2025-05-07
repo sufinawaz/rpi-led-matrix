@@ -173,7 +173,7 @@ class WmataPlugin(DisplayPlugin):
             try:
                 self.font_tiny.LoadFont(tiny_path)
                 self.font_small.LoadFont(small_path)
-                self.font.LoadFont(regular_path)
+                self.font.LoadFont(tiny_path)
                 logger.info(f"Loaded fonts from {os.path.dirname(tiny_path)}")
                 return
             except Exception as e:
@@ -432,7 +432,7 @@ class WmataPlugin(DisplayPlugin):
             info_color = (255, 255, 255)  # White for longer times
 
         # Draw train info
-        text_draw.text((2, 8), train_info, fill=info_color)
+        text_draw.text((2, 6), train_info, fill=info_color)
 
     def update(self, delta_time):
         """Update WMATA display"""

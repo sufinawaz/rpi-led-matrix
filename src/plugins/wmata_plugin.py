@@ -396,13 +396,13 @@ class WmataPlugin(DisplayPlugin):
         """Draw the station name (either static or scrolling)"""
         if not self.should_scroll.get(station_code, False):
             # Static display
-            text_draw.text((2, 0), station_name, fill=(255, 255, 255))
+            text_draw.text((2, -1), station_name, fill=(255, 255, 255))
         else:
             # Scrolling display
             scroll_x = width - left_width - self.scroll_position + 10
 
             # Reset when scrolled off screen
-            if scroll_x < -self.station_name_width[station_code] + 15:
+            if scroll_x < -self.station_name_width[station_code] - 15:
                 scroll_x = width - left_width
 
             # Draw only when visible

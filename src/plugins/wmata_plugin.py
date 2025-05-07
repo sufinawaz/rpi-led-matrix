@@ -159,13 +159,13 @@ class WmataPlugin(DisplayPlugin):
 
         from PIL import ImageFont
         try:
-            # Try to load a smaller font - you can experiment with different fonts/sizes
-            self.pil_font_small = ImageFont.truetype("resources/fonts/5x7.bdf", 8)  # 8pt font
-            self.pil_font_tiny = ImageFont.truetype("resources/fonts/4x6.bdf", 6)   # 6pt font
+            # Try a thin system font - paths depend on your OS
+            self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 8)
+            # Or try a condensed font
+            # self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 8)
         except:
             # Fallback to default
-            self.pil_font_small = ImageFont.load_default()
-            self.pil_font_tiny = self.pil_font_small
+            self.pil_font = ImageFont.load_default()
         # Initial data fetch
         self._fetch_train_data()
 
@@ -404,38 +404,19 @@ class WmataPlugin(DisplayPlugin):
     def _draw_station_name(self, text_draw, station_code, station_name, width, left_width):
         """Draw the station name (either static or scrolling)"""
         if not self.should_scroll.get(station_code, False):
-            # Static display - draw character by character with 1px spacing
-            x_pos = 2
-            for char in station_name:
-                text_draw.text((x_pos, -1), char, fill=(255, 255, 255))
-                # Move position based on character (narrower for i, l, etc.)
-                if char in 'il.,\'':
-                    x_pos += 2  # Narrow characters
-                elif char in 'mw':
-                    x_pos += 5  # Wide characters
-                else:
-                    x_pos += 4  # Normal characters
+            # Static display
+            text_draw.text((2, 0), station_name, font=self.pil_font, fill=(255, 255, 255))
         else:
             # Scrolling display
             scroll_x = width - left_width - self.scroll_position
 
-            # Reset when scrolled far off screen
+            # Reset when scrolled off screen
             if scroll_x < -self.station_name_width[station_code] - 100:
                 scroll_x = width - left_width
 
             # Draw only when visible
             if scroll_x < width - left_width:
-                # Draw character by character with custom spacing
-                x_pos = scroll_x
-                for char in station_name:
-                    text_draw.text((x_pos, 0), char, fill=(255, 255, 255))
-                    # Move position based on character (narrower for i, l, etc.)
-                    if char in 'il.,\'':
-                        x_pos += 2  # Narrow characters
-                    elif char in 'mw':
-                        x_pos += 5  # Wide characters
-                    else:
-                        x_pos += 4  # Normal characters
+                text_draw.text((scroll_x, 0), station_name, font=self.pil_font, fill=(255, 255, 255))
 
     def _draw_train_times(self, text_draw, station_data, trains):
         """Draw the train arrival times"""

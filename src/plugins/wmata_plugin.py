@@ -3,7 +3,7 @@ import time
 import requests
 import logging
 from datetime import datetime
-from PIL import Image, ImageFont ,ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from rgbmatrix import graphics
 import os
 from .base_plugin import DisplayPlugin
@@ -19,7 +19,7 @@ class WmataPlugin(DisplayPlugin):
     and scrolling station name with arrival times.
     """
 
-    # Metro line colors (moved to class variable to reduce memory usage)
+    # Metro line colors (class constants for memory efficiency)
     LINE_COLORS = {
         'RD': [255, 0, 0],      # Red
         'BL': [0, 0, 255],      # Blue
@@ -67,30 +67,30 @@ class WmataPlugin(DisplayPlugin):
         'N12': 'Downtown Largo'
     }
 
-    # Station to line mapping (merged red line stations for efficiency)
+    # Station to line mapping (use dictionary comprehensions for efficiency)
     STATION_LINES = {
         # Red Line stations (all A* and B* codes)
         **{code: 'RD' for code in ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08',
-                                   'A09', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15',
-                                   'B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07',
-                                   'B08', 'B09', 'B10', 'B11']},
+                                  'A09', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15',
+                                  'B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07',
+                                  'B08', 'B09', 'B10', 'B11']},
         # Blue Line
         **{code: 'BL' for code in ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08',
-                                   'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15',
-                                   'G01', 'G02', 'G03', 'G04', 'G05']},
+                                  'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15',
+                                  'G01', 'G02', 'G03', 'G04', 'G05']},
         # Orange Line
         **{code: 'OR' for code in ['D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08',
-                                   'D09', 'D10', 'D11', 'D12', 'D13', 'J01', 'J02',
-                                   'J03', 'J04', 'K01', 'K02', 'K03', 'K04']},
+                                  'D09', 'D10', 'D11', 'D12', 'D13', 'J01', 'J02',
+                                  'J03', 'J04', 'K01', 'K02', 'K03', 'K04']},
         # Silver Line
         **{code: 'SV' for code in ['K05', 'K06', 'K07', 'K08', 'N01', 'N02', 'N03', 'N04',
-                                   'N06', 'N08', 'N09', 'N10']},
+                                  'N06', 'N08', 'N09', 'N10']},
         # Green Line
         **{code: 'GR' for code in ['E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08',
-                                   'E09', 'E10']},
+                                  'E09', 'E10']},
         # Yellow Line
         **{code: 'YL' for code in ['F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08',
-                                   'F09', 'F10', 'F11']}
+                                  'F09', 'F10', 'F11']}
     }
 
     def __init__(self, matrix, config=None):
@@ -118,78 +118,58 @@ class WmataPlugin(DisplayPlugin):
         self.should_scroll = {}  # Whether a station name needs scrolling
         self.scroll_amount = {}  # Total scroll amount needed for each station
 
-        # Font loading
-        self.font = graphics.Font()
-        self.font_small = graphics.Font()
-        self.font_tiny = graphics.Font()
+        # Single PIL font for all text rendering
+        self.pil_font = None  # Will be initialized in setup()
 
-        # Colors (reused for graphics)
-        self.graphics_colors = self._init_graphics_colors()
+        # Colors for error messages
+        self.graphics_colors = {
+            'white': graphics.Color(255, 255, 255),
+            'error': graphics.Color(255, 0, 0)
+        }
 
         # API response cache
         self.api_cache = {}
         self.api_cache_time = {}
 
-    def _init_graphics_colors(self):
-        """Initialize commonly used graphics.Color objects"""
-        return {
-            'white': graphics.Color(255, 255, 255),
-            'black': graphics.Color(0, 0, 0),
-            'red': graphics.Color(255, 0, 0),
-            'blue': graphics.Color(0, 0, 255),
-            'green': graphics.Color(0, 255, 0),
-            'orange': graphics.Color(255, 165, 0),
-            'silver': graphics.Color(192, 192, 192),
-            'yellow': graphics.Color(255, 255, 0),
-            'gray': graphics.Color(128, 128, 128),
-            'medium_gray': graphics.Color(100, 100, 100),
-            'error': graphics.Color(255, 0, 0)
-        }
-
     def setup(self):
         """Set up the WMATA plugin"""
-        # Load fonts - try multiple locations for better compatibility
-        self._load_fonts()
-
         # Check configuration
         logger.info(f"WMATA plugin configuration: {self.config}")
 
         # Validate and normalize station configuration
         self._validate_stations()
 
-        from PIL import ImageFont
+        # Load PIL font for drawing text
         try:
-            # Try a thin system font - paths depend on your OS
-            self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
-            # Or try a condensed font
-            # self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 8)
-        except:
-            # Fallback to default
+            from PIL import ImageFont
+            # Try loading a thin font first
+            try:
+                self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
+                logger.info("Using DejaVuSansMono-Bold for text rendering")
+            except:
+                # Try other common font paths
+                font_paths = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                    "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf"
+                ]
+                
+                for path in font_paths:
+                    if os.path.exists(path):
+                        self.pil_font = ImageFont.truetype(path, 8)
+                        logger.info(f"Using {path} for text rendering")
+                        break
+                else:
+                    # Fallback to default
+                    self.pil_font = ImageFont.load_default()
+                    logger.warning("Using default font - could not find DejaVu fonts")
+        except Exception as e:
+            logger.error(f"Error loading PIL font: {e}")
+            from PIL import ImageFont
             self.pil_font = ImageFont.load_default()
+
         # Initial data fetch
         self._fetch_train_data()
-
-    def _load_fonts(self):
-        """Load fonts from various possible locations"""
-        font_paths = [
-            # Try project fonts first
-            ("resources/fonts/4x6.bdf", "resources/fonts/5x7.bdf", "resources/fonts/7x13.bdf"),
-            # Then system fonts
-            ("/usr/share/fonts/misc/4x6.bdf", "/usr/share/fonts/misc/5x7.bdf", "/usr/share/fonts/misc/7x13.bdf")
-        ]
-
-        for tiny_path, small_path, regular_path in font_paths:
-            try:
-                self.font_tiny.LoadFont(tiny_path)
-                self.font_small.LoadFont(small_path)
-                self.font.LoadFont(tiny_path)
-                logger.info(f"Loaded fonts from {os.path.dirname(tiny_path)}")
-                return
-            except Exception as e:
-                logger.debug(f"Could not load fonts from {os.path.dirname(tiny_path)}: {e}")
-                continue
-
-        logger.warning("Could not load fonts from any location")
 
     def _validate_stations(self):
         """Validate and normalize station configuration"""
@@ -315,15 +295,26 @@ class WmataPlugin(DisplayPlugin):
         # Available width for name display (matrix width minus left section)
         left_width = 16  # 16px for line circle
         available_width = self.matrix.width - left_width
-        char_width = 7  # Approximate pixels per character
+
+        # Create a dummy image to measure text width
+        from PIL import Image, ImageDraw
+        dummy = Image.new('RGB', (1, 1))
+        draw = ImageDraw.Draw(dummy)
 
         for station_code in self.config.get('stations', [])[:2]:
             # Get station name
             station_data = self.train_data.get(station_code, {})
             station_name = station_data.get("name", self.STATION_NAMES.get(station_code, station_code))
 
-            # Calculate approximate width
-            name_width = len(station_name) * char_width
+            # Measure text width with the current font
+            try:
+                # For newer PIL versions
+                bbox = draw.textbbox((0, 0), station_name, font=self.pil_font)
+                name_width = bbox[2] - bbox[0]
+            except:
+                # For older PIL versions
+                name_width = draw.textsize(station_name, font=self.pil_font)[0]
+
             self.station_name_width[station_code] = name_width
 
             # Determine if scrolling is needed
@@ -440,7 +431,7 @@ class WmataPlugin(DisplayPlugin):
         else:
             info_color = (255, 255, 255)  # White for longer times
 
-        # Draw train info with the same thin font
+        # Draw train info 
         text_draw.text((2, 8), train_info, font=self.pil_font, fill=info_color)
 
     def update(self, delta_time):
@@ -483,17 +474,19 @@ class WmataPlugin(DisplayPlugin):
         # Show error/loading message if no display
         api_key = self.config.get('api_key', '')
         if not api_key:
-            # No API key message
-            graphics.DrawText(canvas, self.font, 2, 16,
-                             self.graphics_colors['error'], "WMATA API")
-            graphics.DrawText(canvas, self.font, 2, 25,
-                             self.graphics_colors['error'], "Key Missing")
+            # No API key message - using PIL since we removed RGBMatrix fonts
+            error_image = Image.new('RGB', (self.matrix.width, self.matrix.height), (0, 0, 0))
+            error_draw = ImageDraw.Draw(error_image)
+            error_draw.text((2, 8), "WMATA API", font=self.pil_font, fill=(255, 0, 0))
+            error_draw.text((2, 16), "Key Missing", font=self.pil_font, fill=(255, 0, 0))
+            canvas.SetImage(error_image)
         else:
             # Loading message
-            graphics.DrawText(canvas, self.font, 2, 16,
-                             self.graphics_colors['white'], "Loading")
-            graphics.DrawText(canvas, self.font, 2, 25,
-                             self.graphics_colors['white'], "train data")
+            loading_image = Image.new('RGB', (self.matrix.width, self.matrix.height), (0, 0, 0))
+            loading_draw = ImageDraw.Draw(loading_image)
+            loading_draw.text((2, 8), "Loading", font=self.pil_font, fill=(255, 255, 255))
+            loading_draw.text((2, 16), "train data", font=self.pil_font, fill=(255, 255, 255))
+            canvas.SetImage(loading_image)
 
     def cleanup(self):
         """Clean up resources"""

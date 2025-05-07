@@ -3,7 +3,7 @@ import time
 import requests
 import logging
 from datetime import datetime
-from PIL import Image, ImageDraw
+from PIL import Image, ImageFont ,ImageDraw
 from rgbmatrix import graphics
 import os
 from .base_plugin import DisplayPlugin
@@ -157,6 +157,15 @@ class WmataPlugin(DisplayPlugin):
         # Validate and normalize station configuration
         self._validate_stations()
 
+        from PIL import ImageFont
+        try:
+            # Try to load a smaller font - you can experiment with different fonts/sizes
+            self.pil_font_small = ImageFont.truetype("resources/fonts/5x7.bdf", 8)  # 8pt font
+            self.pil_font_tiny = ImageFont.truetype("resources/fonts/4x6.bdf", 6)   # 6pt font
+        except:
+            # Fallback to default
+            self.pil_font_small = ImageFont.load_default()
+            self.pil_font_tiny = self.pil_font_small
         # Initial data fetch
         self._fetch_train_data()
 
@@ -322,7 +331,7 @@ class WmataPlugin(DisplayPlugin):
 
             # Calculate total scroll amount if needed
             if self.should_scroll[station_code]:
-                self.scroll_amount[station_code] = name_width + 10  # Add padding
+                self.scroll_amount[station_code] = name_width + 40  # Add padding
             else:
                 self.scroll_amount[station_code] = 0
 
@@ -402,7 +411,7 @@ class WmataPlugin(DisplayPlugin):
             scroll_x = width - left_width - self.scroll_position + 10
 
             # Reset when scrolled off screen
-            if scroll_x < -self.station_name_width[station_code]:
+            if scroll_x < -self.station_name_width[station_code] - 100:
                 scroll_x = width - left_width
 
             # Draw only when visible
@@ -414,13 +423,13 @@ class WmataPlugin(DisplayPlugin):
         if not trains:
             # No trains or error
             if "error" in station_data:
-                text_draw.text((2, 8), "API Error", fill=(255, 0, 0))
+                text_draw.text((2, 8), "API Error", font=self.pil_font_small, fill=(255, 0, 0))
             else:
-                text_draw.text((2, 8), "No trains", fill=(150, 150, 150))
+                text_draw.text((2, 8), "No trains", font=self.pil_font_small, fill=(150, 150, 150))
             return
 
         # Format arrival times
-        train_info = "-".join(train.get('min_display', '') for train in trains)
+        train_info = " - ".join(train.get('min_display', '') for train in trains)
 
         # Determine color based on time
         minutes = trains[0].get('minutes', 999)
@@ -431,8 +440,8 @@ class WmataPlugin(DisplayPlugin):
         else:
             info_color = (255, 255, 255)  # White for longer times
 
-        # Draw train info
-        text_draw.text((2, 7), train_info, fill=info_color)
+        # Draw train info with specified font
+        text_draw.text((2, 7), train_info, font=self.pil_font_small, fill=info_color)
 
     def update(self, delta_time):
         """Update WMATA display"""

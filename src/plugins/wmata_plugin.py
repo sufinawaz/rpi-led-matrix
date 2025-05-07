@@ -399,10 +399,10 @@ class WmataPlugin(DisplayPlugin):
             text_draw.text((2, 0), station_name, fill=(255, 255, 255))
         else:
             # Scrolling display
-            scroll_x = width - left_width - self.scroll_position
+            scroll_x = width - left_width - self.scroll_position + 10
 
             # Reset when scrolled off screen
-            if scroll_x < -self.station_name_width[station_code]:
+            if scroll_x < -self.station_name_width[station_code] + 15:
                 scroll_x = width - left_width
 
             # Draw only when visible
@@ -432,7 +432,7 @@ class WmataPlugin(DisplayPlugin):
             info_color = (255, 255, 255)  # White for longer times
 
         # Draw train info
-        text_draw.text((2, 6), train_info, fill=info_color)
+        text_draw.text((2, 7), train_info, fill=info_color)
 
     def update(self, delta_time):
         """Update WMATA display"""

@@ -127,12 +127,12 @@ class WmataPlugin(DisplayPlugin):
         try:
             from PIL import ImageFont
             try:
-                self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 8)
+                self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
                 logger.info("Using DejaVuSansMono-Bold for text rendering")
             except:
                 # Try other common font paths
                 font_paths = [
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                     "/usr/share/fonts/TTF/DejaVuSans.ttf"
                 ]
 

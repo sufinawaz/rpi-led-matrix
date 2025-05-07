@@ -2,9 +2,7 @@
 import time
 import requests
 import logging
-from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
-from rgbmatrix import graphics
 import os
 from .base_plugin import DisplayPlugin
 
@@ -29,7 +27,7 @@ class WmataPlugin(DisplayPlugin):
         'YL': [255, 255, 0]     # Yellow
     }
 
-    # Simplified station names (cut down on memory usage)
+    # Simplified station names and line mappings
     STATION_NAMES = {
         'A01': 'Metro Center', 'A02': 'Farragut North', 'A03': 'Dupont Circle',
         'A04': 'Woodley Park', 'A05': 'Cleveland Park', 'A06': 'Van Ness-UDC',
@@ -67,28 +65,22 @@ class WmataPlugin(DisplayPlugin):
         'N12': 'Downtown Largo'
     }
 
-    # Station to line mapping (use dictionary comprehensions for efficiency)
+    # Station to line mapping
     STATION_LINES = {
-        # Red Line stations (all A* and B* codes)
         **{code: 'RD' for code in ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08',
                                   'A09', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15',
                                   'B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07',
                                   'B08', 'B09', 'B10', 'B11']},
-        # Blue Line
         **{code: 'BL' for code in ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08',
                                   'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15',
                                   'G01', 'G02', 'G03', 'G04', 'G05']},
-        # Orange Line
         **{code: 'OR' for code in ['D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08',
                                   'D09', 'D10', 'D11', 'D12', 'D13', 'J01', 'J02',
                                   'J03', 'J04', 'K01', 'K02', 'K03', 'K04']},
-        # Silver Line
         **{code: 'SV' for code in ['K05', 'K06', 'K07', 'K08', 'N01', 'N02', 'N03', 'N04',
                                   'N06', 'N08', 'N09', 'N10']},
-        # Green Line
         **{code: 'GR' for code in ['E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08',
                                   'E09', 'E10']},
-        # Yellow Line
         **{code: 'YL' for code in ['F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08',
                                   'F09', 'F10', 'F11']}
     }
@@ -113,19 +105,13 @@ class WmataPlugin(DisplayPlugin):
         self.scroll_timer = 0
         self.scroll_speed = 0.06  # Seconds between scroll updates
 
-        # Text width and image storage
-        self.station_name_width = {}  # Width of each station name in pixels
-        self.should_scroll = {}  # Whether a station name needs scrolling
-        self.scroll_amount = {}  # Total scroll amount needed for each station
+        # Text width and scrolling data
+        self.station_name_width = {}
+        self.should_scroll = {}
+        self.scroll_amount = {}
 
         # Single PIL font for all text rendering
-        self.pil_font = None  # Will be initialized in setup()
-
-        # Colors for error messages
-        self.graphics_colors = {
-            'white': graphics.Color(255, 255, 255),
-            'error': graphics.Color(255, 0, 0)
-        }
+        self.pil_font = None
 
         # API response cache
         self.api_cache = {}
@@ -133,16 +119,13 @@ class WmataPlugin(DisplayPlugin):
 
     def setup(self):
         """Set up the WMATA plugin"""
-        # Check configuration
+        # Check configuration and validate stations
         logger.info(f"WMATA plugin configuration: {self.config}")
-
-        # Validate and normalize station configuration
         self._validate_stations()
 
         # Load PIL font for drawing text
         try:
             from PIL import ImageFont
-            # Try loading a thin font first
             try:
                 self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
                 logger.info("Using DejaVuSansMono-Bold for text rendering")
@@ -150,8 +133,7 @@ class WmataPlugin(DisplayPlugin):
                 # Try other common font paths
                 font_paths = [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans.ttf",
-                    "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf"
+                    "/usr/share/fonts/TTF/DejaVuSans.ttf"
                 ]
 
                 for path in font_paths:
@@ -160,11 +142,10 @@ class WmataPlugin(DisplayPlugin):
                         logger.info(f"Using {path} for text rendering")
                         break
                 else:
-                    # Fallback to default
                     self.pil_font = ImageFont.load_default()
-                    logger.warning("Using default font - could not find DejaVu fonts")
+                    logger.warning("Using default font")
         except Exception as e:
-            logger.error(f"Error loading PIL font: {e}")
+            logger.error(f"Error loading font: {e}")
             from PIL import ImageFont
             self.pil_font = ImageFont.load_default()
 
@@ -174,15 +155,10 @@ class WmataPlugin(DisplayPlugin):
     def _validate_stations(self):
         """Validate and normalize station configuration"""
         stations = self.config.get('stations', [])
-
-        # Ensure we have exactly 2 stations
         if len(stations) > 2:
             self.config['stations'] = stations[:2]
-            logger.info("Limited to 2 stations only")
-
         while len(self.config['stations']) < 2:
-            self.config['stations'].append('C01')  # Add Metro Center as default
-            logger.info("Added default station: Metro Center (C01)")
+            self.config['stations'].append('C01')  # Default to Metro Center
 
     def _fetch_train_data(self):
         """Fetch train arrival predictions from WMATA API"""
@@ -193,37 +169,28 @@ class WmataPlugin(DisplayPlugin):
 
         # Get station codes to fetch (exactly 2)
         stations = self.config.get('stations', [])[:2]
-
         current_time = time.time()
+
         for station_code in stations:
             # Check cache first
             if (station_code in self.api_cache and
                 current_time - self.api_cache_time.get(station_code, 0) < self.config['update_interval']):
-                logger.info(f"Using cached data for station {station_code}")
                 continue
 
             # WMATA API endpoint
             url = f"https://api.wmata.com/StationPrediction.svc/json/GetPrediction/{station_code}"
             headers = {'api_key': api_key}
 
-            logger.info(f"Fetching train data for station {station_code}")
-
             try:
                 response = requests.get(url, headers=headers, timeout=10)
-
                 if response.status_code != 200:
-                    logger.error(f"API error for {station_code}: HTTP {response.status_code}")
                     self.train_data[station_code] = {"error": f"HTTP {response.status_code}"}
                     continue
 
                 # Process response
                 data = response.json()
-
-                # Cache the raw response
                 self.api_cache[station_code] = data
                 self.api_cache_time[station_code] = current_time
-
-                # Process the trains data
                 self._process_station_data(station_code, data)
 
             except Exception as e:
@@ -232,16 +199,12 @@ class WmataPlugin(DisplayPlugin):
 
         # Calculate text widths and prepare for scrolling
         self._prepare_display()
-
-        # Reset update timer
         self.last_update = 0
 
     def _process_station_data(self, station_code, data):
         """Process raw API data for a station"""
         trains = data.get('Trains', [])
-
         if not trains:
-            logger.warning(f"No trains found for station {station_code}")
             self.train_data[station_code] = {
                 "name": self.STATION_NAMES.get(station_code, station_code),
                 "trains": []
@@ -263,8 +226,7 @@ class WmataPlugin(DisplayPlugin):
                 minutes = int(min_val)
                 min_display = f"{minutes}m"
             else:
-                # Skip trains with no arrival information
-                continue
+                continue  # Skip trains with no arrival information
 
             processed_trains.append({
                 'line': train.get('Line', ''),
@@ -282,8 +244,6 @@ class WmataPlugin(DisplayPlugin):
             "trains": processed_trains[:max_trains]
         }
 
-        logger.info(f"Processed {len(processed_trains)} trains for {station_code}")
-
     def _prepare_display(self):
         """Calculate text widths and prepare scrolling parameters"""
         self._calculate_name_widths()
@@ -292,12 +252,10 @@ class WmataPlugin(DisplayPlugin):
 
     def _calculate_name_widths(self):
         """Calculate the pixel width of each station name and determine if scrolling is needed"""
-        # Available width for name display (matrix width minus left section)
         left_width = 16  # 16px for line circle
         available_width = self.matrix.width - left_width
 
         # Create a dummy image to measure text width
-        from PIL import Image, ImageDraw
         dummy = Image.new('RGB', (1, 1))
         draw = ImageDraw.Draw(dummy)
 
@@ -316,15 +274,10 @@ class WmataPlugin(DisplayPlugin):
                 name_width = draw.textsize(station_name, font=self.pil_font)[0]
 
             self.station_name_width[station_code] = name_width
-
-            # Determine if scrolling is needed
             self.should_scroll[station_code] = name_width > available_width
 
             # Calculate total scroll amount if needed
-            if self.should_scroll[station_code]:
-                self.scroll_amount[station_code] = name_width + 40  # Add padding
-            else:
-                self.scroll_amount[station_code] = 0
+            self.scroll_amount[station_code] = name_width + 40 if self.should_scroll[station_code] else 0
 
     def _create_split_screen_display(self):
         """Create a display with split screen for two stations"""
@@ -413,10 +366,9 @@ class WmataPlugin(DisplayPlugin):
         """Draw the train arrival times"""
         if not trains:
             # No trains or error
-            if "error" in station_data:
-                text_draw.text((2, 8), "API Error", font=self.pil_font, fill=(255, 0, 0))
-            else:
-                text_draw.text((2, 8), "No trains", font=self.pil_font, fill=(150, 150, 150))
+            text = "API Error" if "error" in station_data else "No trains"
+            color = (255, 0, 0) if "error" in station_data else (150, 150, 150)
+            text_draw.text((2, 8), text, font=self.pil_font, fill=color)
             return
 
         # Format arrival times
@@ -443,8 +395,7 @@ class WmataPlugin(DisplayPlugin):
             return
 
         # Handle scrolling if needed
-        needs_scrolling = any(self.should_scroll.values())
-        if not needs_scrolling:
+        if not any(self.should_scroll.values()):
             return
 
         # Update scroll position
@@ -472,25 +423,23 @@ class WmataPlugin(DisplayPlugin):
             return
 
         # Show error/loading message if no display
-        api_key = self.config.get('api_key', '')
-        if not api_key:
-            # No API key message - using PIL since we removed RGBMatrix fonts
-            error_image = Image.new('RGB', (self.matrix.width, self.matrix.height), (0, 0, 0))
-            error_draw = ImageDraw.Draw(error_image)
+        error_image = Image.new('RGB', (self.matrix.width, self.matrix.height), (0, 0, 0))
+        error_draw = ImageDraw.Draw(error_image)
+
+        if not self.config.get('api_key', ''):
+            # No API key message
             error_draw.text((2, 8), "WMATA API", font=self.pil_font, fill=(255, 0, 0))
             error_draw.text((2, 16), "Key Missing", font=self.pil_font, fill=(255, 0, 0))
-            canvas.SetImage(error_image)
         else:
             # Loading message
-            loading_image = Image.new('RGB', (self.matrix.width, self.matrix.height), (0, 0, 0))
-            loading_draw = ImageDraw.Draw(loading_image)
-            loading_draw.text((2, 8), "Loading", font=self.pil_font, fill=(255, 255, 255))
-            loading_draw.text((2, 16), "train data", font=self.pil_font, fill=(255, 255, 255))
-            canvas.SetImage(loading_image)
+            error_draw.text((2, 8), "Loading", font=self.pil_font, fill=(255, 255, 255))
+            error_draw.text((2, 16), "train data", font=self.pil_font, fill=(255, 255, 255))
+
+        canvas.SetImage(error_image)
 
     def cleanup(self):
         """Clean up resources"""
-        # Clear any cached data
+        # Clear all cached data
         self.api_cache.clear()
         self.api_cache_time.clear()
         self.train_data.clear()

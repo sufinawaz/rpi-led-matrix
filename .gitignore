@@ -101,3 +101,4 @@ logs/
 resources/fonts/*
 rpi-rgb-led-matrix/
 run_infocube
+config.json

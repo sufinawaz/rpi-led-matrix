@@ -38,9 +38,7 @@ class TextRenderer:
 
             # Fallback to searching in common system directories
             for directory in [
-                "/usr/share/fonts",
                 "resources/fonts",
-                os.path.expanduser("~/.local/share/fonts"),
                 # Add path to the rgb-matrix library fonts
                 os.path.join(os.path.dirname(__file__), "..", "..", "fonts")
             ]:

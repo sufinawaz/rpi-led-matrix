@@ -193,30 +193,30 @@ def install_rgb_matrix_library(project_root):
         logger.error("Failed to install Python bindings")
         return False
 
-    # Copy fonts to the project's resources/fonts directory
-    fonts_source_dir = os.path.join(rgb_matrix_dir, "fonts")
-    fonts_target_dir = os.path.join(project_root, "resources", "fonts")
+    # # Copy fonts to the project's resources/fonts directory
+    # fonts_source_dir = os.path.join(rgb_matrix_dir, "fonts")
+    # fonts_target_dir = os.path.join(project_root, "resources", "fonts")
 
-    if os.path.exists(fonts_source_dir):
-        logger.info("Copying fonts")
-        for font_file in os.listdir(fonts_source_dir):
-            if font_file.endswith('.bdf'):
-                shutil.copy2(
-                    os.path.join(fonts_source_dir, font_file),
-                    os.path.join(fonts_target_dir, font_file)
-                )
+    # if os.path.exists(fonts_source_dir):
+    #     logger.info("Copying fonts")
+    #     for font_file in os.listdir(fonts_source_dir):
+    #         if font_file.endswith('.bdf'):
+    #             shutil.copy2(
+    #                 os.path.join(fonts_source_dir, font_file),
+    #                 os.path.join(fonts_target_dir, font_file)
+    #             )
 
-        # Specifically check for the required font files
-        required_fonts = ["4x6.bdf", "7x13.bdf"]
-        found_fonts = os.listdir(fonts_target_dir)
+    #     # Specifically check for the required font files
+    #     required_fonts = ["4x6.bdf", "7x13.bdf"]
+    #     found_fonts = os.listdir(fonts_target_dir)
 
-        for required_font in required_fonts:
-            if required_font in found_fonts:
-                logger.info(f"Found required font: {required_font}")
-            else:
-                logger.warning(f"Required font {required_font} not found!")
+    #     for required_font in required_fonts:
+    #         if required_font in found_fonts:
+    #             logger.info(f"Found required font: {required_font}")
+    #         else:
+    #             logger.warning(f"Required font {required_font} not found!")
 
-    return True
+    # return True
 
 def install_python_dependencies():
     """Install required Python packages, handling externally managed environments"""

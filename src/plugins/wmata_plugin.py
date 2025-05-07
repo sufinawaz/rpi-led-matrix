@@ -376,7 +376,7 @@ class WmataPlugin(DisplayPlugin):
         draw.text((circle_x - 4, circle_y - 3), primary_line, fill=(0, 0, 0))
 
         # Create the text section image
-        text_image = Image.new('RGB', (width - left_width, half_height), (0, 0, 0))
+        text_image = Image.new('RGB', (width - left_width, half_height-1), (0, 0, 0))
         text_draw = ImageDraw.Draw(text_image)
 
         # Draw station name (static or scrolling)
@@ -399,10 +399,10 @@ class WmataPlugin(DisplayPlugin):
             text_draw.text((2, 0), station_name, fill=(255, 255, 255))
         else:
             # Scrolling display
-            scroll_x = width - left_width - self.scroll_position
+            scroll_x = width - left_width - self.scroll_position + 10
 
             # Reset when scrolled off screen
-            if scroll_x < -self.station_name_width[station_code]:
+            if scroll_x < -self.station_name_width[station_code] - 10:
                 scroll_x = width - left_width
 
             # Draw only when visible
@@ -414,9 +414,9 @@ class WmataPlugin(DisplayPlugin):
         if not trains:
             # No trains or error
             if "error" in station_data:
-                text_draw.text((2, 8), "API Error", fill=(255, 0, 0))
+                text_draw.text((2, 6), "API Error", fill=(255, 0, 0))
             else:
-                text_draw.text((2, 8), "No trains", fill=(150, 150, 150))
+                text_draw.text((2, 6), "No trains", fill=(150, 150, 150))
             return
 
         # Format arrival times
@@ -432,7 +432,7 @@ class WmataPlugin(DisplayPlugin):
             info_color = (255, 255, 255)  # White for longer times
 
         # Draw train info
-        text_draw.text((2, 8), train_info, fill=info_color)
+        text_draw.text((2, 6), train_info, fill=info_color)
 
     def update(self, delta_time):
         """Update WMATA display"""

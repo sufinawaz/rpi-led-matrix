@@ -402,7 +402,7 @@ class WmataPlugin(DisplayPlugin):
             scroll_x = width - left_width - self.scroll_position + 10
 
             # Reset when scrolled off screen
-            if scroll_x < -self.station_name_width[station_code] - 40:
+            if scroll_x < -self.station_name_width[station_code] + 40:
                 scroll_x = width - left_width
 
             # Draw only when visible

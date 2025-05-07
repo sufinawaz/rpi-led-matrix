@@ -101,7 +101,7 @@ class DisplayManager:
         logger.info(f"Loaded {len(self.plugins)} plugins")
 
     def set_plugin(self, plugin_name):
-        """Switch to the specified plugin
+        """Switch to the specified plugin with improved transition handling
 
         Args:
             plugin_name: Name of the plugin to activate
@@ -116,14 +116,20 @@ class DisplayManager:
         logger.info(f"Switching to plugin: {plugin_name}")
 
         try:
-            # Clean up current plugin if active
+            # Create a transitional fade effect first
+            self._show_transition_screen("Loading...")
+
+            # Initialize the new plugin before shutting down the old one
+            new_plugin = self.plugins[plugin_name]
+            new_plugin.setup()
+
+            # Now clean up current plugin if active
             if self.current_plugin:
                 self.current_plugin.stop()
                 self.current_plugin.cleanup()
 
-            # Initialize and activate new plugin
-            self.current_plugin = self.plugins[plugin_name]
-            self.current_plugin.setup()
+            # Activate the new plugin
+            self.current_plugin = new_plugin
             self.current_plugin.start()
 
             return True
@@ -178,3 +184,56 @@ class DisplayManager:
             if self.current_plugin:
                 self.current_plugin.stop()
                 self.current_plugin
+
+    def _show_transition_screen(self, message="Loading..."):
+        """Display a transition screen with a loading indicator
+
+        Args:
+            message: Message to display during transition
+        """
+        from PIL import Image, ImageDraw, ImageFont
+        import time
+
+        # Create a new image for the transition screen
+        width = self.matrix.width
+        height = self.matrix.height
+        image = Image.new('RGB', (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # Try to load a font
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+        except:
+            # Use default font if custom font not available
+            font = ImageFont.load_default()
+
+        # Draw the message
+        message_width = font.getbbox(message)[2] if hasattr(font, 'getbbox') else len(message) * 6
+        x = (width - message_width) // 2
+        draw.text((x, height // 2 - 4), message, font=font, fill=(255, 255, 255))
+
+        # Draw a simple animated loading bar
+        bar_width = width // 2
+        bar_x = (width - bar_width) // 2
+        bar_y = height // 2 + 6
+
+        # Draw the empty bar outline
+        draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + 4], outline=(255, 255, 255), fill=(0, 0, 0))
+
+        # Display the initial frame
+        self.canvas.SetImage(image)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        # Animate the loading bar (short animation to avoid long delay)
+        for i in range(1, 6):
+            # Update progress bar
+            progress = i / 5
+            fill_width = int(bar_width * progress)
+            draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_width - 1, bar_y + 3], fill=(0, 255, 0))
+
+            # Update display
+            self.canvas.SetImage(image)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+            # Short delay for animation
+            time.sleep(0.05)

@@ -423,20 +423,25 @@ class WmataPlugin(DisplayPlugin):
         if not trains:
             # No trains or error
             if "error" in station_data:
-                # Draw "API Error" character by character
-                error_text = "API Error"
-                x_pos = 2
-                for char in error_text:
-                    text_draw.text((x_pos, 8), char, fill=(255, 0, 0))
-                    x_pos += 4
+                text_draw.text((2, 8), "API Error", font=self.pil_font, fill=(255, 0, 0))
             else:
-                # Draw "No trains" character by character
-                no_trains_text = "No trains"
-                x_pos = 2
-                for char in no_trains_text:
-                    text_draw.text((x_pos, 8), char, fill=(150, 150, 150))
-                    x_pos += 4
+                text_draw.text((2, 8), "No trains", font=self.pil_font, fill=(150, 150, 150))
             return
+
+        # Format arrival times
+        train_info = " - ".join(train.get('min_display', '') for train in trains)
+
+        # Determine color based on time
+        minutes = trains[0].get('minutes', 999)
+        if minutes == 0:
+            info_color = (255, 165, 0)  # Orange for arriving/boarding
+        elif minutes <= 5:
+            info_color = (0, 255, 0)    # Green for soon
+        else:
+            info_color = (255, 255, 255)  # White for longer times
+
+        # Draw train info with the same thin font
+        text_draw.text((2, 8), train_info, font=self.pil_font, fill=info_color)
 
         # Format arrival times
         train_info = " - ".join(train.get('min_display', '') for train in trains)

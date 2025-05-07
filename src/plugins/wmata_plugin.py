@@ -160,7 +160,7 @@ class WmataPlugin(DisplayPlugin):
         from PIL import ImageFont
         try:
             # Try a thin system font - paths depend on your OS
-            self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 8)
+            self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
             # Or try a condensed font
             # self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 8)
         except:

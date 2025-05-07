@@ -420,7 +420,7 @@ class WmataPlugin(DisplayPlugin):
             return
 
         # Format arrival times
-        train_info = " - ".join(train.get('min_display', '') for train in trains)
+        train_info = "-".join(train.get('min_display', '') for train in trains)
 
         # Determine color based on time
         minutes = trains[0].get('minutes', 999)

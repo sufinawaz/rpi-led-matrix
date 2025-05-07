@@ -443,30 +443,6 @@ class WmataPlugin(DisplayPlugin):
         # Draw train info with the same thin font
         text_draw.text((2, 8), train_info, font=self.pil_font, fill=info_color)
 
-        # Format arrival times
-        train_info = " - ".join(train.get('min_display', '') for train in trains)
-
-        # Determine color based on time
-        minutes = trains[0].get('minutes', 999)
-        if minutes == 0:
-            info_color = (255, 165, 0)  # Orange for arriving/boarding
-        elif minutes <= 5:
-            info_color = (0, 255, 0)    # Green for soon
-        else:
-            info_color = (255, 255, 255)  # White for longer times
-
-        # Draw train info character by character
-        x_pos = 2
-        for char in train_info:
-            text_draw.text((x_pos, 8), char, fill=info_color)
-            # Move position based on character
-            if char in 'il.,\'':
-                x_pos += 2  # Narrow characters
-            elif char in 'mw':
-                x_pos += 5  # Wide characters
-            else:
-                x_pos += 4  # Normal characters
-
     def update(self, delta_time):
         """Update WMATA display"""
         # Update API data when interval elapsed

@@ -107,7 +107,15 @@ class DisplayManager:
         logger.info(f"Loaded {len(self.plugins)} plugins")
 
     def set_plugin(self, plugin_name):
-        """Switch to the specified plugin with improved transition handling
+        """
+        Switch to the specified plugin with a smooth slide transition.
+
+        This method handles the complete plugin switching process including:
+        1. Checking if the plugin exists
+        2. Setting up the new plugin before stopping the current one
+        3. Running the transition animation between plugins
+        4. Performing proper cleanup of the old plugin
+        5. Starting the new plugin and saving state
 
         Args:
             plugin_name: Name of the plugin to activate
@@ -115,43 +123,57 @@ class DisplayManager:
         Returns:
             True if successful, False otherwise
         """
+        # Validate that the requested plugin exists
         if plugin_name not in self.plugins:
             logger.error(f"Plugin not found: {plugin_name}")
             return False
 
+        # Skip the whole process if it's already the active plugin
+        if self.current_plugin and self.current_plugin.name == plugin_name:
+            logger.info(f"Plugin {plugin_name} is already active")
+            return True
+
         logger.info(f"Switching to plugin: {plugin_name}")
 
         try:
-            # Create a transitional fade effect first
-            self._show_transition_screen("Loading...")
-
-            # Initialize the new plugin before shutting down the old one
+            # Step 1: Set up the new plugin first to prevent delays during transition
             new_plugin = self.plugins[plugin_name]
             new_plugin.setup()
 
-            # Now clean up current plugin if active
+            # Step 2: Run the sliding transition animation
+            self._show_transition_screen()
+
+            # Step 3: Clean up the current plugin properly
             if self.current_plugin:
                 self.current_plugin.stop()
                 self.current_plugin.cleanup()
 
-            # Activate the new plugin
+            # Step 4: Activate the new plugin
             self.current_plugin = new_plugin
             self.current_plugin.start()
 
-            # Save the current plugin to the config
-            last_plugin_name = getattr(self.current_plugin, 'name', plugin_name)
-            if last_plugin_name == 'gif':
-                # Save GIF name for GIF plugin
+            # Step 5: Update saved state
+            # Save plugin-specific settings for GIF mode
+            if plugin_name == 'gif':
+                # Save current GIF name for GIF plugin
                 gif_name = self.current_plugin.config.get('current_gif', '')
                 if gif_name:
                     self.config.set("current_state", "current_gif", gif_name)
 
-            # Save current plugin
-            self.config.set("current_state", "current_plugin", last_plugin_name)
+            # Save current plugin name
+            self.config.set("current_state", "current_plugin", plugin_name)
+
+            # Force immediate render of the new content
+            self.canvas.Clear()
+            self.current_plugin.render(self.canvas)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
             return True
+
         except Exception as e:
             logger.error(f"Error setting plugin {plugin_name}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
 
     def run(self):
@@ -228,55 +250,75 @@ class DisplayManager:
             logger.warning(f"Default plugin '{default_plugin}' not available, using '{first_plugin}'")
             self.set_plugin(first_plugin)
 
-    def _show_transition_screen(self, message="Loading..."):
-        """Display a transition screen with a loading indicator
+    def _show_transition_screen(self, message=None):
+        """
+        Create a smooth sliding transition animation when switching between plugins.
+
+        This transition slides the current content off to the left while the new
+        content appears from the right, creating an intuitive visual effect.
 
         Args:
-            message: Message to display during transition
+            message: Optional message to display during transition (not used in slide animation)
         """
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image
         import time
+        import math
 
-        # Create a new image for the transition screen
+        # Get display dimensions
         width = self.matrix.width
         height = self.matrix.height
-        image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
 
-        # Try to load a font
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-        except:
-            # Use default font if custom font not available
-            font = ImageFont.load_default()
+        # Step 1: Capture current display content before transition
+        current_display = Image.new('RGB', (width, height), (0, 0, 0))
 
-        # Draw the message
-        message_width = font.getbbox(message)[2] if hasattr(font, 'getbbox') else len(message) * 6
-        x = (width - message_width) // 2
-        draw.text((x, height // 2 - 4), message, font=font, fill=(255, 255, 255))
-
-        # Draw a simple animated loading bar
-        bar_width = width // 2
-        bar_x = (width - bar_width) // 2
-        bar_y = height // 2 + 6
-
-        # Draw the empty bar outline
-        draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + 4], outline=(255, 255, 255), fill=(0, 0, 0))
-
-        # Display the initial frame
-        self.canvas.SetImage(image)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        # Animate the loading bar (short animation to avoid long delay)
-        for i in range(1, 6):
-            # Update progress bar
-            progress = i / 5
-            fill_width = int(bar_width * progress)
-            draw.rectangle([bar_x + 1, bar_y + 1, bar_x + fill_width - 1, bar_y + 3], fill=(0, 255, 0))
-
-            # Update display
-            self.canvas.SetImage(image)
+        # Only attempt to capture current display if we have an active plugin
+        if self.current_plugin:
+            # Force a fresh render to make sure we have the latest content
+            self.canvas.Clear()
+            self.current_plugin.render(self.canvas)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-            # Short delay for animation
-            time.sleep(0.05)
+            # Convert canvas content to PIL Image for animation
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = self.canvas.GetPixel(x, y)
+                    current_display.putpixel((x, y), (r, g, b))
+
+        # Step 2: Configure animation parameters
+        steps = 20                # Total animation frames
+        transition_time = 0.4     # Total transition duration in seconds
+        frame_time = transition_time / steps  # Time per frame
+
+        # Create a blank image for the transition frames
+        transition_image = Image.new('RGB', (width, height), (0, 0, 0))
+
+        # Step 3: Perform the slide animation
+        for step in range(steps + 1):
+            # Calculate animation progress (0.0 to 1.0)
+            progress = step / steps
+
+            # Apply easing function for smoother motion (sine easing)
+            # This makes the animation start and end more gradually
+            eased_progress = math.sin(progress * math.pi / 2)
+
+            # Calculate pixel offset for sliding
+            offset = int(width * eased_progress)
+
+            # Clear the transition image for this frame
+            transition_image = Image.new('RGB', (width, height), (0, 0, 0))
+
+            # Slide current content to the left
+            transition_image.paste(current_display, (-offset, 0))
+
+            # Display the frame
+            self.canvas.SetImage(transition_image)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+            # Add a small delay based on desired frame rate
+            # Adjust timing for smoother animation at start/end points
+            sleep_time = frame_time
+            if progress < 0.2 or progress > 0.8:
+                # Slow down at beginning and end for smoother appearance
+                sleep_time *= 1.2
+
+            time.sleep(max(0.001, sleep_time))  # Ensure minimum delay

@@ -7,6 +7,8 @@ import pkgutil
 from rgbmatrix import RGBMatrixOptions, RGBMatrix
 # Import the base plugin class
 from plugins.base_plugin import DisplayPlugin
+# Import our new API server
+from api_server import APIServer
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,10 @@ class DisplayManager:
 
         # Load plugins
         self.load_plugins()
+
+        # Initialize API server
+        self.api_server = APIServer(self)
+        self.api_server.start()
 
     def _init_matrix(self):
         """Initialize the RGB matrix"""
@@ -132,6 +138,17 @@ class DisplayManager:
             self.current_plugin = new_plugin
             self.current_plugin.start()
 
+            # Save the current plugin to the config
+            last_plugin_name = getattr(self.current_plugin, 'name', plugin_name)
+            if last_plugin_name == 'gif':
+                # Save GIF name for GIF plugin
+                gif_name = self.current_plugin.config.get('current_gif', '')
+                if gif_name:
+                    self.config.set("current_state", "current_gif", gif_name)
+
+            # Save current plugin
+            self.config.set("current_state", "current_plugin", last_plugin_name)
+
             return True
         except Exception as e:
             logger.error(f"Error setting plugin {plugin_name}: {e}")
@@ -145,12 +162,25 @@ class DisplayManager:
 
         # Set default plugin if none active
         if not self.current_plugin:
-            default_plugin = self.config.get("plugins", "default", "clock")
-            if not self.set_plugin(default_plugin):
-                # Use first available plugin if default not available
-                first_plugin = next(iter(self.plugins.keys()))
-                logger.warning(f"Default plugin '{default_plugin}' not available, using '{first_plugin}'")
-                self.set_plugin(first_plugin)
+            # Try to restore last state from config
+            last_plugin = self.config.get("current_state", "current_plugin", "")
+
+            if last_plugin in self.plugins:
+                # Try to restore previous state
+                if last_plugin == 'gif':
+                    # For GIF plugin, also restore GIF name
+                    gif_name = self.config.get("current_state", "current_gif", "")
+                    if gif_name:
+                        gif_plugin = self.plugins.get('gif')
+                        if gif_plugin:
+                            gif_plugin.config['current_gif'] = gif_name
+
+                if not self.set_plugin(last_plugin):
+                    # Fall back to default if restoration fails
+                    self._set_default_plugin()
+            else:
+                # No valid saved state, use default
+                self._set_default_plugin()
 
         logger.info("Starting main display loop")
 
@@ -180,10 +210,23 @@ class DisplayManager:
         except Exception as e:
             logger.error(f"Error in display loop: {e}")
         finally:
-            # Clean up
+            # Stop API server
+            if hasattr(self, 'api_server'):
+                self.api_server.stop()
+
+            # Clean up plugins
             if self.current_plugin:
                 self.current_plugin.stop()
-                self.current_plugin
+                self.current_plugin.cleanup()
+
+    def _set_default_plugin(self):
+        """Set the default plugin based on configuration"""
+        default_plugin = self.config.get("plugins", "default", "clock")
+        if not self.set_plugin(default_plugin):
+            # Use first available plugin if default not available
+            first_plugin = next(iter(self.plugins.keys()))
+            logger.warning(f"Default plugin '{default_plugin}' not available, using '{first_plugin}'")
+            self.set_plugin(first_plugin)
 
     def _show_transition_screen(self, message="Loading..."):
         """Display a transition screen with a loading indicator

@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 import shutil
 import re
 import json
+from api_client import APIClient
 
 # Setup logging
 logging.basicConfig(
@@ -19,8 +20,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Replace the API client instantiation after the app creation
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # For flash messages
+app.secret_key = os.urandom(24)
+# Create API client instance
+api_client = APIClient(host='localhost', port=8081)
 
 # Use the correct project root directory
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ''))
@@ -79,8 +83,27 @@ def scan_gifs():
     logger.info(f"Found GIFs: {available_gifs}")
     return sorted(available_gifs)
 
+# Replace the change_display_mode function with this version:
 def change_display_mode(mode, gif_name=None):
-    """Change the InfoCube display mode by restarting the service with new parameters"""
+    """Change the InfoCube display mode by communicating with the running application"""
+    # First, try to use the API client
+    if mode == "gif" and gif_name:
+        success = api_client.set_gif(gif_name)
+
+        # Update gif plugin configuration in config file too
+        if success:
+            gif_config = get_plugin_config("gif")
+            gif_config["current_gif"] = gif_name
+            update_plugin_config("gif", gif_config)
+            return True
+    else:
+        success = api_client.set_mode(mode)
+        if success:
+            return True
+
+    # If API client fails (service not running with API), fall back to the old method
+    logger.warning("API client failed to change mode, falling back to service restart method")
+
     # Build the ExecStart command
     exec_command = f"/usr/bin/python3 {PROJECT_ROOT}/src/infocube.py --display-mode={mode}"
     if mode == "gif" and gif_name:
@@ -130,8 +153,33 @@ WantedBy=multi-user.target
         logger.error(f"Error changing display mode: {e}")
         return False
 
+# Replace the get_current_status function with this version:
 def get_current_status():
     """Get the current status of the InfoCube display service"""
+    # First, try to use the API client
+    status_data = api_client.get_status()
+    if status_data:
+        # API is available
+        current_mode = status_data.get('current_plugin', 'unknown')
+        current_gif = status_data.get('current_gif', '')
+
+        # Check if service is running
+        try:
+            result = subprocess.run(
+                ["sudo", "systemctl", "is-active", "infocube-display.service"],
+                capture_output=True, 
+                text=True, 
+                check=False
+            )
+            service_status = result.stdout.strip()
+            is_running = service_status == "active"
+        except:
+            service_status = "unknown"
+            is_running = status_data.get('running', False)
+
+        return is_running, service_status, current_mode, current_gif
+
+    # If API client fails (service not running with API), fall back to the old method
     try:
         result = subprocess.run(
             ["sudo", "systemctl", "is-active", "infocube-display.service"],

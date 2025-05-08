@@ -84,6 +84,10 @@ class ConfigManager:
                         "update_interval": 3600
                     }
                 }
+            },
+            "current_state": {
+                "current_plugin": "clock",
+                "current_gif": ""
             }
         }
 
@@ -121,8 +125,6 @@ class ConfigManager:
         Returns:
             Configuration value or default
         """
-        print(f"get() called with section={section}, key={key}, default={default}")
-
         if key is None:
             return self.config.get(section, default)
 
@@ -132,8 +134,8 @@ class ConfigManager:
             try:
                 return section_data.get(key, default)
             except TypeError as e:
-                print(f"TypeError in get: section={section}, key={key}, default={default}")
-                print(f"Error: {e}")
+                logger.error(f"TypeError in get: section={section}, key={key}, default={default}")
+                logger.error(f"Error: {e}")
                 # Return default as a fallback
                 return default
         return default

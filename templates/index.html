@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark-mode">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            /* Light theme variables */
             --primary: #4361ee;
             --primary-light: #6583ff;
             --primary-dark: #3a56d4;
@@ -21,41 +20,10 @@
             --card-bg: #ffffff;
             --card-border: #e5e7eb;
             --body-bg: #f3f4f6;
-            --text-color: #1f2937;
             --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            --header-bg: #ffffff;
-            --input-bg: #ffffff;
-            --input-border: #e5e7eb;
-            --tab-hover: rgba(67, 97, 238, 0.05);
-            --preview-bg: #f3f4f6;
-
-            /* Common variables */
             --sidebar-width: 260px;
             --header-height: 60px;
             --transition: all 0.3s ease;
-        }
-
-        /* Dark theme variables */
-        .dark-mode {
-            --primary: #6583ff;
-            --primary-light: #8ba4ff;
-            --primary-dark: #4361ee;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --light: #374151;
-            --dark: #f3f4f6;
-            --gray: #9ca3af;
-            --card-bg: #1f2937;
-            --card-border: #374151;
-            --body-bg: #111827;
-            --text-color: #f3f4f6;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            --header-bg: #1f2937;
-            --input-bg: #374151;
-            --input-border: #4b5563;
-            --tab-hover: rgba(101, 131, 255, 0.1);
-            --preview-bg: #2d3748;
         }
 
         * {
@@ -67,10 +35,9 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
             line-height: 1.6;
-            color: var(--text-color);
+            color: var(--dark);
             background-color: var(--body-bg);
             min-height: 100vh;
-            transition: var(--transition);
         }
 
         .app-container {
@@ -85,7 +52,7 @@
         }
 
         header {
-            background-color: var(--header-bg);
+            background-color: var(--card-bg);
             box-shadow: var(--shadow);
             padding: 0 20px;
             height: var(--header-height);
@@ -95,7 +62,6 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            transition: var(--transition);
         }
 
         .logo {
@@ -115,25 +81,6 @@
             display: flex;
             align-items: center;
             gap: 15px;
-        }
-
-        .theme-toggle {
-            background: none;
-            border: none;
-            color: var(--text-color);
-            font-size: 1.2rem;
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-
-        .theme-toggle:hover {
-            background-color: var(--tab-hover);
         }
 
         .status-pill {
@@ -171,7 +118,7 @@
             font-size: 1.25rem;
             font-weight: 600;
             margin-bottom: 20px;
-            color: var(--text-color);
+            color: var(--dark);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -187,7 +134,7 @@
         }
 
         .card:hover {
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
             transform: translateY(-2px);
         }
 
@@ -245,12 +192,12 @@
         }
 
         .btn-secondary {
-            background-color: var(--light);
-            color: var(--text-color);
+            background-color: #e5e7eb;
+            color: var(--dark);
         }
 
         .btn-secondary:hover:not(:disabled) {
-            filter: brightness(0.9);
+            background-color: #d1d5db;
         }
 
         .btn-success {
@@ -259,7 +206,7 @@
         }
 
         .btn-success:hover:not(:disabled) {
-            filter: brightness(0.9);
+            background-color: #0ea573;
         }
 
         .btn-danger {
@@ -268,7 +215,7 @@
         }
 
         .btn-danger:hover:not(:disabled) {
-            filter: brightness(0.9);
+            background-color: #dc2626;
         }
 
         .btn-warning {
@@ -277,7 +224,7 @@
         }
 
         .btn-warning:hover:not(:disabled) {
-            filter: brightness(0.9);
+            background-color: #d97706;
         }
 
         .power-controls {
@@ -294,7 +241,7 @@
             margin-bottom: 20px;
             padding: 12px;
             border-radius: 8px;
-            background-color: rgba(101, 131, 255, 0.1);
+            background-color: rgba(67, 97, 238, 0.05);
         }
 
         .mode-icon {
@@ -339,7 +286,7 @@
         }
 
         .plugin-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             transform: translateY(-3px);
         }
 
@@ -363,7 +310,7 @@
             width: 40px;
             height: 40px;
             border-radius: 8px;
-            background-color: rgba(101, 131, 255, 0.1);
+            background-color: rgba(67, 97, 238, 0.1);
             color: var(--primary);
             font-size: 1.2rem;
         }
@@ -385,7 +332,7 @@
 
         .plugin-preview {
             height: 100px;
-            background-color: var(--preview-bg);
+            background-color: #f3f4f6;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -429,7 +376,7 @@
         }
 
         .gif-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             transform: translateY(-3px);
         }
 
@@ -440,7 +387,7 @@
 
         .gif-preview {
             height: 100px;
-            background-color: var(--preview-bg);
+            background-color: #f3f4f6;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -497,7 +444,7 @@
         }
 
         .tab:hover {
-            background-color: var(--tab-hover);
+            background-color: rgba(67, 97, 238, 0.05);
         }
 
         .tab.active {
@@ -527,18 +474,16 @@
         .form-control {
             width: 100%;
             padding: 10px 12px;
-            border: 1px solid var(--input-border);
+            border: 1px solid var(--card-border);
             border-radius: 8px;
             font-size: 0.9rem;
             transition: var(--transition);
-            background-color: var(--input-bg);
-            color: var(--text-color);
         }
 
         .form-control:focus {
             outline: none;
             border-color: var(--primary-light);
-            box-shadow: 0 0 0 3px rgba(101, 131, 255, 0.2);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
         }
 
         .form-text {
@@ -559,27 +504,23 @@
             padding: 12px 16px;
             margin-bottom: 12px;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-out 4s forwards;
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .dark-mode .flash {
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-        }
-
         .flash-success {
-            background-color: rgba(16, 185, 129, 0.1);
+            background-color: #ecfdf5;
             border-left: 4px solid var(--success);
-            color: var(--success);
+            color: #064e3b;
         }
 
         .flash-error {
-            background-color: rgba(239, 68, 68, 0.1);
+            background-color: #fef2f2;
             border-left: 4px solid var(--danger);
-            color: var(--danger);
+            color: #7f1d1d;
         }
 
         .flash-icon {
@@ -609,6 +550,7 @@
                 transform: translateX(100%);
                 opacity: 0;
             }
+
             to {
                 transform: translateX(0);
                 opacity: 1;
@@ -619,6 +561,7 @@
             from {
                 opacity: 1;
             }
+
             to {
                 opacity: 0;
             }
@@ -666,12 +609,30 @@
             margin-right: 6px;
         }
 
-        .red-line { background-color: #E51636; }
-        .blue-line { background-color: #0076CE; }
-        .orange-line { background-color: #F68712; }
-        .green-line { background-color: #00B551; }
-        .yellow-line { background-color: #FFD200; color: black; }
-        .silver-line { background-color: #9D9F9C; }
+        .red-line {
+            background-color: #E51636;
+        }
+
+        .blue-line {
+            background-color: #0076CE;
+        }
+
+        .orange-line {
+            background-color: #F68712;
+        }
+
+        .green-line {
+            background-color: #00B551;
+        }
+
+        .yellow-line {
+            background-color: #FFD200;
+            color: black;
+        }
+
+        .silver-line {
+            background-color: #9D9F9C;
+        }
     </style>
 </head>
 
@@ -696,9 +657,6 @@
                 InfoCube Remote
             </div>
             <div class="header-controls">
-                <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode">
-                    <i class="fas fa-sun"></i>
-                </button>
                 <div class="status-pill active">
                     <i class="fas fa-circle"></i>
                     Active
@@ -923,7 +881,8 @@
                             </div>
                         </div>
                         <div class="plugin-preview">
-                            <div style="display: flex; flex-direction: column; width: 100%; height: 100%; padding: 10px; justify-content: space-between; background: #111;">
+                            <div
+                                style="display: flex; flex-direction: column; width: 100%; height: 100%; padding: 10px; justify-content: space-between; background: #111;">
                                 <div style="display: flex; align-items: center; color: white; font-size: 10px;">
                                     <span class="line-circle red-line">RD</span>
                                     <span>Shady Grove • 3m</span>
@@ -1023,24 +982,6 @@
                                         <i class="fas fa-play-circle"></i>
                                     </div>
                                     <div class="gif-info">
-                                        <div class="gif-name">fireworks</div>
-                                        <div class="gif-actions">
-                                            <button class="btn btn-success">
-                                                <i class="fas fa-play"></i>
-                                                Play
-                                            </button>
-                                            <button class="btn btn-danger">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="gif-card">
-                                    <div class="gif-preview">
-                                        <i class="fas fa-play-circle"></i>
-                                    </div>
-                                    <div class="gif-info">
                                         <div class="gif-name">rainbow</div>
                                         <div class="gif-actions">
                                             <button class="btn btn-success">
@@ -1060,11 +1001,13 @@
                             <form action="#" method="post">
                                 <div class="form-group">
                                     <label class="form-label" for="gif_url">GIF URL</label>
-                                    <input type="url" id="gif_url" name="gif_url" class="form-control" placeholder="https://example.com/animation.gif" required>
+                                    <input type="url" id="gif_url" name="gif_url" class="form-control"
+                                        placeholder="https://example.com/animation.gif" required>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="gif_name">Custom Name (optional)</label>
-                                    <input type="text" id="gif_name" name="gif_name" class="form-control" placeholder="my_cool_animation">
+                                    <input type="text" id="gif_name" name="gif_name" class="form-control"
+                                        placeholder="my_cool_animation">
                                 </div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-plus"></i> Add GIF
@@ -1076,11 +1019,13 @@
                             <form action="#" method="post" enctype="multipart/form-data">
                                 <div class="form-group">
                                     <label class="form-label" for="gif_file">Select GIF File</label>
-                                    <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif" required>
+                                    <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif"
+                                        required>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="gif_upload_name">Custom Name (optional)</label>
-                                    <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control" placeholder="my_cool_animation">
+                                    <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control"
+                                        placeholder="my_cool_animation">
                                 </div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-upload"></i> Upload GIF
@@ -1103,14 +1048,17 @@
                             <div class="form-group">
                                 <label class="form-label" for="weather_api_key">OpenWeatherMap API Key</label>
                                 <div style="position: relative;">
-                                    <input type="password" id="weather_api_key" name="weather_api_key" class="form-control" placeholder="Enter your API key" value="••••••••1234">
-                                    <button type="button" id="toggle-api-key" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--gray);">
+                                    <input type="password" id="weather_api_key" name="weather_api_key"
+                                        class="form-control" placeholder="Enter your API key" value="••••••••1234">
+                                    <button type="button" id="toggle-api-key"
+                                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer;">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                 </div>
                                 <div class="form-text">
                                     <i class="fas fa-info-circle"></i>
-                                    Get your API key at <a href="https://openweathermap.org/api" target="_blank" style="color: var(--primary);">OpenWeatherMap</a>
+                                    Get your API key at <a href="https://openweathermap.org/api"
+                                        target="_blank">OpenWeatherMap</a>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary">
@@ -1128,40 +1076,6 @@
     </div>
 
     <script>
-        // Theme toggle functionality
-        const themeToggle = document.getElementById('theme-toggle');
-        const htmlElement = document.documentElement;
-
-        // Function to update the theme toggle button icon
-        function updateThemeIcon(isDark) {
-            const icon = themeToggle.querySelector('i');
-            if (isDark) {
-                icon.classList.remove('fa-moon');
-                icon.classList.add('fa-sun');
-            } else {
-                icon.classList.remove('fa-sun');
-                icon.classList.add('fa-moon');
-            }
-        }
-
-        // Check for saved theme preference or use default dark mode
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light') {
-            htmlElement.classList.remove('dark-mode');
-            updateThemeIcon(false);
-        } else {
-            // Default to dark mode
-            htmlElement.classList.add('dark-mode');
-            updateThemeIcon(true);
-        }
-
-        // Theme toggle event handler
-        themeToggle.addEventListener('click', () => {
-            const isDarkMode = htmlElement.classList.toggle('dark-mode');
-            updateThemeIcon(isDarkMode);
-            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-        });
-
         // Tab functionality
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -1183,7 +1097,7 @@
         });
 
         // Toggle API key visibility
-        document.getElementById('toggle-api-key').addEventListener('click', function() {
+        document.getElementById('toggle-api-key').addEventListener('click', function () {
             const apiKeyInput = document.getElementById('weather_api_key');
             const toggleIcon = this.querySelector('i');
 
@@ -1217,4 +1131,23 @@
         }, 5000);
     </script>
 </body>
-</html>
+
+</html>btn btn-success">
+<i class="fas fa-play"></i>
+Play
+</button>
+<button class="btn btn-danger">
+    <i class="fas fa-trash"></i>
+</button>
+</div>
+</div>
+</div>
+
+<div class="gif-card">
+    <div class="gif-preview">
+        <i class="fas fa-play-circle"></i>
+    </div>
+    <div class="gif-info">
+        <div class="gif-name">fireworks</div>
+        <div class="gif-actions">
+            <button class="

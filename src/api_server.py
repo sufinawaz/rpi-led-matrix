@@ -132,14 +132,31 @@ class APIServer:
             # Update GIF plugin configuration
             gif_plugin = self.display_manager.plugins.get('gif')
             if gif_plugin:
+                # Update the current GIF setting
+                previous_gif = gif_plugin.config.get('current_gif', '')
                 gif_plugin.config['current_gif'] = gif_name
 
-            # Switch to GIF plugin
-            success = self.display_manager.set_plugin(plugin_name)
-            return {
-                "status": "success" if success else "error",
-                "message": f"Switched to GIF: {gif_name}" if success else f"Failed to switch to GIF: {gif_name}"
-            }
+                # If already in GIF mode and the GIF plugin has the reload method, use it
+                if (self.display_manager.current_plugin and 
+                    self.display_manager.current_plugin.name == 'gif' and
+                    hasattr(gif_plugin, 'reload_if_changed')):
+
+                    # Force reload the GIF
+                    reloaded = gif_plugin.reload_if_changed()
+                    if reloaded:
+                        return {
+                            "status": "success",
+                            "message": f"Changed GIF to: {gif_name}"
+                        }
+
+                # Otherwise, switch to GIF plugin (which will load the new GIF)
+                success = self.display_manager.set_plugin(plugin_name)
+                return {
+                    "status": "success" if success else "error",
+                    "message": f"Switched to GIF: {gif_name}" if success else f"Failed to switch to GIF: {gif_name}"
+                }
+            else:
+                return {"status": "error", "message": "GIF plugin not available"}
 
         elif command == 'get_status':
             current_plugin = None

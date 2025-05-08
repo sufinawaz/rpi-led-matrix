@@ -41,6 +41,9 @@ class GifPlugin(DisplayPlugin):
         # Track errors to avoid constant logging
         self.reported_error = False
 
+        # Track current loaded GIF to detect changes
+        self.current_loaded_gif = None
+
     def setup(self):
         """Set up the GIF plugin"""
         # Load font
@@ -55,17 +58,30 @@ class GifPlugin(DisplayPlugin):
         # Reset error reporting flag
         self.reported_error = False
 
+    def reload_if_changed(self):
+        """Check if the GIF has changed and reload if necessary"""
+        current_gif = self.config.get('current_gif', 'matrix')
+        if current_gif != self.current_loaded_gif:
+            print(f"GIF changed from '{self.current_loaded_gif}' to '{current_gif}', reloading...")
+            self._load_gif()
+            return True
+        return False
+
     def _load_gif(self):
         """Load the current GIF"""
+        # Get current GIF name from config
+        gif_name = self.config.get('current_gif', 'matrix')
+        self.current_loaded_gif = gif_name
+
         # Determine GIF path
-        gif_name = self.config['current_gif']
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-        gif_dir = os.path.join(project_root, self.config['directory'])
+        gif_dir = os.path.join(project_root, self.config.get('directory', 'resources/images/gifs'))
         gif_path = os.path.join(gif_dir, f"{gif_name}.gif")
 
         # Check if file exists
         if not os.path.exists(gif_path):
             print(f"GIF file not found: {gif_path}")
+            self.gif_component = None
             return
 
         try:
@@ -81,9 +97,13 @@ class GifPlugin(DisplayPlugin):
                         self.gif_component.frames[i] = frame.convert('RGB')
         except Exception as e:
             print(f"Error loading GIF: {e}")
+            self.gif_component = None
 
     def update(self, delta_time):
         """Update GIF animation"""
+        # Check if GIF has changed in config and reload if needed
+        self.reload_if_changed()
+
         if self.gif_component:
             try:
                 self.gif_component.update(delta_time)
@@ -125,7 +145,7 @@ class GifPlugin(DisplayPlugin):
                 return
 
         # Overlay clock if enabled
-        if self.config['show_clock']:
+        if self.config.get('show_clock', True):
             import datetime
             now = datetime.datetime.now()
 

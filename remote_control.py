@@ -389,8 +389,35 @@ def index():
 @app.route('/set_mode/<mode>')
 def set_mode(mode):
     logger.info(f"Setting mode to: {mode}")
-    if mode in ['clock', 'prayer', 'intro', 'moon', 'weather', 'stock', 'wmata']:
+
+    # Special handling for gif mode - select a default gif if needed
+    if mode == 'gif':
+        # Get the current gif configuration
+        gif_config = get_plugin_config('gif')
+        current_gif = gif_config.get('current_gif', '')
+
+        # Get list of available gifs
+        available_gifs = scan_gifs()
+
+        # If no current gif or the current one doesn't exist, select the first available
+        if not current_gif or (available_gifs and current_gif not in available_gifs):
+            if available_gifs:
+                current_gif = available_gifs[0]
+                gif_config['current_gif'] = current_gif
+                update_plugin_config('gif', gif_config)
+
+        # If we have a valid gif, use it
+        if current_gif:
+            change_display_mode('gif', current_gif)
+            flash(f"Switched to animation mode: {current_gif}", "success")
+        else:
+            # No gifs available
+            flash("No animations available. Please add some GIFs first.", "error")
+            return redirect(url_for('index'))
+    else:
+        # Normal mode switching
         change_display_mode(mode)
+
     return redirect(url_for('index'))
 
 @app.route('/set_gif', methods=['POST'])

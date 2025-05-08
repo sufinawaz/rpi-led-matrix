@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Fixed version of the stock_plugin.py to properly handle Finnhub API restrictions
+Enhanced stock plugin with rotating single-stock display and improved visuals
 """
 
 import time
@@ -24,6 +24,7 @@ class StockPlugin(DisplayPlugin):
         symbols (list): List of stock symbols to display
         api_key (str): API key for Finnhub
         update_interval (int): How often to update stock data in seconds
+        rotation_interval (int): How long to display each stock in seconds
         time_period (str): Time period to display ('day', 'week', '3month')
         graph_colors (list): RGB color tuples for each stock graph
     """
@@ -36,7 +37,8 @@ class StockPlugin(DisplayPlugin):
         # Default configuration
         self.config.setdefault('symbols', ['AAPL', 'MSFT', 'AMZN'])
         self.config.setdefault('api_key', '')
-        self.config.setdefault('update_interval', 3600)  # 1 hour by default
+        self.config.setdefault('update_interval', 900)  # 15 minutes by default
+        self.config.setdefault('rotation_interval', 2)  # 2 seconds per stock
         self.config.setdefault('time_period', 'day')
         self.config.setdefault('graph_colors', [
             [0, 255, 0],  # Green
@@ -46,13 +48,17 @@ class StockPlugin(DisplayPlugin):
 
         # Internal state
         self.last_update = 0
+        self.last_rotation = 0
         self.stock_data = {}
         self.stock_error = {}
-        self.combined_image = None
+        self.stock_images = {}
+        self.current_stock_idx = 0
+        self.valid_symbols = []
 
         # Font loading
         self.font = graphics.Font()
         self.font_small = graphics.Font()
+        self.font_large = graphics.Font()
 
         # Colors
         self.colors = {
@@ -71,7 +77,13 @@ class StockPlugin(DisplayPlugin):
         # Load fonts
         try:
             self.font_small.LoadFont("resources/fonts/4x6.bdf")
-            self.font.LoadFont("resources/fonts/7x13.bdf") 
+            self.font.LoadFont("resources/fonts/7x13.bdf")
+            # Try to load a larger font for the stock symbol and price
+            try:
+                self.font_large.LoadFont("resources/fonts/9x18.bdf")
+            except:
+                logger.warning("9x18 font not available, using 7x13 instead")
+                self.font_large = self.font
         except Exception as e:
             logger.error(f"Error loading fonts: {e}")
 
@@ -127,9 +139,7 @@ class StockPlugin(DisplayPlugin):
         now = int(time.time())
 
         if self.config['time_period'] == 'day':
-            # One day of data - get 30-minute candles for the last 24 hours
-            # Note: Finnhub free tier restricts to D resolution for anything but today's data
-            # So we'll request daily data for the past week
+            # One day of data
             from_time = now - 7 * 24 * 60 * 60
             resolution = 'D'
         elif self.config['time_period'] == 'week':
@@ -159,6 +169,9 @@ class StockPlugin(DisplayPlugin):
 
         logger.info(f"Using Finnhub API key: {api_key[:4]}...{api_key[-4:] if len(api_key) > 8 else ''}")
 
+        # Reset valid symbols list
+        self.valid_symbols = []
+
         # Fetch data for each symbol
         for i, symbol in enumerate(self.config.get('symbols', [])):
             if not symbol or len(symbol.strip()) == 0:
@@ -167,8 +180,7 @@ class StockPlugin(DisplayPlugin):
             # Clean up the symbol - make sure it's properly formatted (uppercase and trim spaces)
             symbol = symbol.strip().upper()
 
-            # FIXED: Instead of using the stock/candle endpoint which requires premium,
-            # now using the quote endpoint which is available in the free tier
+            # FIXED: Using the quote endpoint which is available in the free tier
             url = "https://finnhub.io/api/v1/quote"
             params = {
                 'symbol': symbol,
@@ -205,13 +217,36 @@ class StockPlugin(DisplayPlugin):
                 # Extract needed data from quote endpoint
                 current_price = data.get('c', 0)
                 previous_close = data.get('pc', 0)
-                
+                high = data.get('h', current_price)
+                low = data.get('l', current_price)
+                open_price = data.get('o', previous_close)
+
                 # Calculate change
                 price_change = current_price - previous_close
-                
-                # For quote endpoint, we don't get a time series, so we'll create a simplified one
-                # with just two points - yesterday and today
-                prices = [previous_close, current_price]
+                percent_change = (price_change / previous_close * 100) if previous_close > 0 else 0
+
+                # Create more data points for a smoother graph
+                # We'll create a simple approximation by interpolating between open and close
+                num_points = 10
+                prices = []
+
+                # Start with previous close
+                prices.append(previous_close)
+
+                # Interpolate between open and current price
+                for j in range(1, num_points-1):
+                    t = j / (num_points-1)
+                    # Add some variation to make the graph look more interesting
+                    # by using high and low as control points
+                    if j < num_points/2:
+                        # First half: interpolate between open and high/low
+                        prices.append(open_price + (high - open_price) * t * 2)
+                    else:
+                        # Second half: interpolate between high/low and close
+                        prices.append(high + (current_price - high) * (t*2-1))
+
+                # End with current price
+                prices.append(current_price)
 
                 if current_price == 0:
                     logger.error(f"No price data found for {symbol}")
@@ -222,8 +257,16 @@ class StockPlugin(DisplayPlugin):
                 self.stock_data[symbol] = {
                     'prices': prices,
                     'change': price_change,
-                    'current': current_price
+                    'percent_change': percent_change,
+                    'current': current_price,
+                    'high': high,
+                    'low': low,
+                    'open': open_price,
+                    'previous_close': previous_close
                 }
+
+                # Add to valid symbols list
+                self.valid_symbols.append(symbol)
 
                 logger.info(f"Successfully loaded stock data for {symbol}: current price = {current_price}, previous close = {previous_close}, change = {price_change}")
 
@@ -240,133 +283,133 @@ class StockPlugin(DisplayPlugin):
                 logger.error(traceback.format_exc())
                 self.stock_error[symbol] = str(e)
 
-        # Create the combined graph after fetching all stock data
-        self._create_combined_graph()
+        # Create individual stock images after fetching all stock data
+        self._create_stock_images()
         self.last_update = 0
 
-    def _create_combined_graph(self):
-        """Create a combined graph image with all stocks"""
-        # Create a new image for the complete display
+    def _create_stock_images(self):
+        """Create individual image for each stock"""
         width = self.matrix.width
         height = self.matrix.height
-        image = Image.new('RGB', (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
 
-        # Define section sizes
-        # Left side: 14 pixels for stock names and current prices
-        # Right side: remaining width for graphs
-        left_width = 14
-        graph_width = width - left_width
-        graph_height = height - 5  # Leave room for period display at top
+        # Clear the current stock images dict
+        self.stock_images = {}
 
-        # Get all valid stock symbols with data
-        valid_symbols = [symbol for symbol in self.config.get('symbols', []) if symbol in self.stock_data]
+        # Create an image for each valid stock
+        for symbol in self.valid_symbols:
+            # Create a new image
+            image = Image.new('RGB', (width, height), (0, 0, 0))
+            draw = ImageDraw.Draw(image)
 
-        if not valid_symbols:
-            # No valid stock data available
-            self.combined_image = image
-            return
+            stock_data = self.stock_data[symbol]
 
-        # Draw time period indicator at top right
-        period_text = {
-            'day': '1D',
-            'week': '1W', 
-            '3month': '3M'
-        }.get(self.config.get('time_period', 'day'), '1D')
+            # Get color based on whether the stock is up or down
+            change = stock_data['change']
+            color = (0, 255, 0) if change >= 0 else (255, 0, 0)  # Green if positive, red if negative
 
-        # Draw time period background (dark rectangle)
-        draw.rectangle([(width - 10, 0), (width, 5)], fill=(20, 20, 20))
+            # Draw stock symbol in upper left (large font)
+            draw.text((2, 0), symbol, fill=(255, 255, 255), font=None)  # None font will be handled by PIL
 
-        # Display stock names on the left
-        for i, symbol in enumerate(valid_symbols):
-            if i >= 3:  # Maximum 3 stocks
-                break
+            # Format price and change
+            current_price = stock_data['current']
+            price_text = f"${current_price:.2f}"
 
-            y_pos = 7 + i * 8
+            # Draw price in upper right
+            price_width = len(price_text) * 9  # Approximate width with large font
+            draw.text((width - price_width - 2, 0), price_text, fill=color, font=None)
 
-            # Get color for this stock
-            color_index = min(i, len(self.config.get('graph_colors', [])) - 1)
-            graph_colors = self.config.get('graph_colors', [[0, 255, 0], [0, 191, 255], [255, 165, 0]])
+            # Draw percent change below the price
+            percent_change = stock_data['percent_change']
+            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.2f}%"
+            change_width = len(change_text) * 5  # Approximate width with small font
+            draw.text((width - change_width - 2, 12), change_text, fill=color, font=None)
 
-            if color_index < len(graph_colors):
-                color = tuple(graph_colors[color_index])
-            else:
-                color = (0, 255, 0)  # Default to green
+            # Draw graph taking up the lower part of the screen
+            graph_y_start = 18  # Start below the text
+            graph_height = height - graph_y_start
 
-            # Draw stock symbol
-            draw.text((0, y_pos), symbol, fill=color)
-
-            # Draw current price and change indicator below the symbol
-            current = self.stock_data[symbol]['current']
-            change = self.stock_data[symbol]['change']
-
-            # Format price to fit in small space
-            price_text = f"${current:.1f}"
-
-            # Determine change color
-            change_color = (0, 255, 0) if change >= 0 else (255, 0, 0)  # Green if positive, red if negative
-
-            # Draw price
-            draw.text((0, y_pos + 6), price_text, fill=color)
-
-            # Draw small up/down indicator (using ASCII instead of Unicode)
-            arrow = "+" if change >= 0 else "-"
-            draw.text((left_width - 5, y_pos + 6), arrow, fill=change_color)
-
-            # Draw graph line
-            prices = self.stock_data[symbol]['prices']
+            prices = stock_data['prices']
 
             if prices and len(prices) > 1:
+                # Find min and max for scaling
+                min_price = min(prices)
+                max_price = max(prices)
+                price_range = max_price - min_price
+
+                # Ensure a minimum range to prevent division by zero
+                if price_range < 0.01:
+                    price_range = 0.01
+
+                # Draw the graph line
                 points = []
                 for j, price in enumerate(prices):
-                    # Scale x position across the graph width - note we only have 2 points now
-                    x = left_width + (j * graph_width / (len(prices) - 1))
-
-                    # Calculate y position - we need to scale between min and max of prices
-                    min_price = min(prices)
-                    max_price = max(prices)
-                    price_range = max_price - min_price
-                    
-                    # Ensure a minimum range to prevent division by zero
-                    if price_range < 0.01:
-                        price_range = 0.01
+                    # Scale x position across the width
+                    x = int(j * width / (len(prices) - 1))
 
                     # Scale y position to fit graph height (reverse Y axis)
-                    y = 5 + (graph_height - ((price - min_price) / price_range * graph_height))
+                    y = graph_y_start + int(graph_height - ((price - min_price) / price_range * graph_height))
 
                     points.append((x, y))
 
-                # Draw the line
-                if len(points) > 1:
-                    draw.line(points, fill=color, width=1)
+                # Draw the line with appropriate color
+                draw.line(points, fill=color, width=2)
 
-        # Draw time period indicator (last to overlay)
-        draw.text((width - 10, 0), period_text, fill=(150, 150, 150))
+                # Draw price markers
+                for k in range(1, 10, 2):
+                    mark_price = min_price + (k / 10) * price_range
+                    mark_y = graph_y_start + int(graph_height - ((mark_price - min_price) / price_range * graph_height))
+                    draw.line([(0, mark_y), (width, mark_y)], fill=(20, 20, 30), width=1)
 
-        # Store the final image
-        self.combined_image = image
+            # Store the image
+            self.stock_images[symbol] = image
+
+        # Reset current stock index if needed
+        if self.valid_symbols and self.current_stock_idx >= len(self.valid_symbols):
+            self.current_stock_idx = 0
 
     def update(self, delta_time):
         """Update stock ticker display"""
         # Update timers
         self.last_update += delta_time
+        self.last_rotation += delta_time
 
-        # Update stock data based on interval
+        # Update stock data based on interval (15 minutes)
         if self.last_update >= self.config['update_interval']:
             self._fetch_stock_data()
+            self.last_rotation = 0  # Reset rotation timer after refresh
+            return
+
+        # Rotate stocks every X seconds (default 2 seconds)
+        if self.last_rotation >= self.config['rotation_interval'] and self.valid_symbols:
+            self.last_rotation = 0
+            self.current_stock_idx = (self.current_stock_idx + 1) % len(self.valid_symbols)
 
     def render(self, canvas):
         """Render the stock ticker display"""
         # Clear canvas
         canvas.Clear()
 
-        # Check if we have a combined image to display
-        if self.combined_image:
-            # Set the image on the canvas
-            canvas.SetImage(self.combined_image)
-            return
+        # If we have valid stocks, show the current one
+        if self.valid_symbols:
+            current_symbol = self.valid_symbols[self.current_stock_idx]
 
-        # If no combined image (meaning no valid stock data), display error message
+            if current_symbol in self.stock_images:
+                # Display the pre-rendered image for this stock
+                canvas.SetImage(self.stock_images[current_symbol])
+                return
+            else:
+                # Fallback if image not found - should not happen
+                graphics.DrawText(canvas, self.font, 2, 10, 
+                                self.colors['white'], current_symbol)
+
+                stock_data = self.stock_data.get(current_symbol, {})
+                if 'current' in stock_data:
+                    price_text = f"${stock_data['current']:.2f}"
+                    color = self.colors['green'] if stock_data.get('change', 0) >= 0 else self.colors['red']
+                    graphics.DrawText(canvas, self.font, 2, 24, color, price_text)
+                return
+
+        # No valid stocks - show error message
         valid_symbols = self.config.get('symbols', [])
         valid_symbols = [s for s in valid_symbols if s and len(s.strip()) > 0]
 

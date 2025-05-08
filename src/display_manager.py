@@ -106,16 +106,64 @@ class DisplayManager:
 
         logger.info(f"Loaded {len(self.plugins)} plugins")
 
+    def _show_transition_screen(self, message=None):
+        """
+        Create a smooth sliding transition animation when switching between plugins.
+
+        Instead of trying to read pixels from the current canvas (which isn't supported),
+        this implementation creates a simple slide-out transition using a black screen.
+
+        Args:
+            message: Optional message to display during transition (not used in slide animation)
+        """
+        from PIL import Image, ImageDraw
+        import time
+        import math
+
+        # Get display dimensions
+        width = self.matrix.width
+        height = self.matrix.height
+
+        # Animation parameters
+        steps = 15                 # Total animation frames
+        transition_time = 0.3      # Total transition duration in seconds
+        frame_time = transition_time / steps  # Time per frame
+
+        # Create a black background image for the animation
+        black_background = Image.new('RGB', (width, height), (0, 0, 0))
+
+        # Perform the slide-out animation
+        for step in range(steps + 1):
+            # Calculate animation progress (0.0 to 1.0)
+            progress = step / steps
+
+            # Apply easing function for smoother motion (sine easing)
+            eased_progress = math.sin(progress * math.pi / 2)
+
+            # Calculate slide offset
+            offset = int(width * eased_progress)
+
+            # Create a transition image for this frame
+            transition_image = Image.new('RGB', (width, height), (0, 0, 0))
+
+            # Optional: Add subtle transition effects
+            if step > 0:
+                draw = ImageDraw.Draw(transition_image)
+                # Draw a subtle gradient on the right side
+                for x in range(width - offset, width):
+                    intensity = int(30 * (1 - ((x - (width - offset)) / offset))) if offset > 0 else 0
+                    draw.line([(x, 0), (x, height)], fill=(intensity, intensity, intensity))
+
+            # Display the frame
+            self.canvas.SetImage(transition_image)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+            # Add a small delay based on desired frame rate
+            time.sleep(max(0.01, frame_time))
+
     def set_plugin(self, plugin_name):
         """
-        Switch to the specified plugin with a smooth slide transition.
-
-        This method handles the complete plugin switching process including:
-        1. Checking if the plugin exists
-        2. Setting up the new plugin before stopping the current one
-        3. Running the transition animation between plugins
-        4. Performing proper cleanup of the old plugin
-        5. Starting the new plugin and saving state
+        Switch to the specified plugin with a simple sliding transition.
 
         Args:
             plugin_name: Name of the plugin to activate
@@ -250,75 +298,3 @@ class DisplayManager:
             logger.warning(f"Default plugin '{default_plugin}' not available, using '{first_plugin}'")
             self.set_plugin(first_plugin)
 
-    def _show_transition_screen(self, message=None):
-        """
-        Create a smooth sliding transition animation when switching between plugins.
-
-        This transition slides the current content off to the left while the new
-        content appears from the right, creating an intuitive visual effect.
-
-        Args:
-            message: Optional message to display during transition (not used in slide animation)
-        """
-        from PIL import Image
-        import time
-        import math
-
-        # Get display dimensions
-        width = self.matrix.width
-        height = self.matrix.height
-
-        # Step 1: Capture current display content before transition
-        current_display = Image.new('RGB', (width, height), (0, 0, 0))
-
-        # Only attempt to capture current display if we have an active plugin
-        if self.current_plugin:
-            # Force a fresh render to make sure we have the latest content
-            self.canvas.Clear()
-            self.current_plugin.render(self.canvas)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-            # Convert canvas content to PIL Image for animation
-            for y in range(height):
-                for x in range(width):
-                    r, g, b = self.canvas.GetPixel(x, y)
-                    current_display.putpixel((x, y), (r, g, b))
-
-        # Step 2: Configure animation parameters
-        steps = 20                # Total animation frames
-        transition_time = 0.4     # Total transition duration in seconds
-        frame_time = transition_time / steps  # Time per frame
-
-        # Create a blank image for the transition frames
-        transition_image = Image.new('RGB', (width, height), (0, 0, 0))
-
-        # Step 3: Perform the slide animation
-        for step in range(steps + 1):
-            # Calculate animation progress (0.0 to 1.0)
-            progress = step / steps
-
-            # Apply easing function for smoother motion (sine easing)
-            # This makes the animation start and end more gradually
-            eased_progress = math.sin(progress * math.pi / 2)
-
-            # Calculate pixel offset for sliding
-            offset = int(width * eased_progress)
-
-            # Clear the transition image for this frame
-            transition_image = Image.new('RGB', (width, height), (0, 0, 0))
-
-            # Slide current content to the left
-            transition_image.paste(current_display, (-offset, 0))
-
-            # Display the frame
-            self.canvas.SetImage(transition_image)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-            # Add a small delay based on desired frame rate
-            # Adjust timing for smoother animation at start/end points
-            sleep_time = frame_time
-            if progress < 0.2 or progress > 0.8:
-                # Slow down at beginning and end for smoother appearance
-                sleep_time *= 1.2
-
-            time.sleep(max(0.001, sleep_time))  # Ensure minimum delay

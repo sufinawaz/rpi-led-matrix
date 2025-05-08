@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Fixed version of the stock_plugin.py to properly handle Finnhub API restrictions
+"""
+
 import time
 from datetime import datetime, timedelta
 import os
@@ -123,15 +127,17 @@ class StockPlugin(DisplayPlugin):
         now = int(time.time())
 
         if self.config['time_period'] == 'day':
-            # One day of data - get 30-minute candles for the last 24 hours - available in free tier
-            from_time = now - 24 * 60 * 60
-            resolution = '30'  # Changed from 1 to 30 for free tier access
-        elif self.config['time_period'] == 'week':
-            # One week of data - get daily candles for the last week
+            # One day of data - get 30-minute candles for the last 24 hours
+            # Note: Finnhub free tier restricts to D resolution for anything but today's data
+            # So we'll request daily data for the past week
             from_time = now - 7 * 24 * 60 * 60
-            resolution = 'D'  # Changed from 60 to D for free tier access
+            resolution = 'D'
+        elif self.config['time_period'] == 'week':
+            # One week of data
+            from_time = now - 7 * 24 * 60 * 60
+            resolution = 'D'
         elif self.config['time_period'] == '3month':
-            # Three months of data - get daily candles for the last 90 days
+            # Three months of data
             from_time = now - 90 * 24 * 60 * 60
             resolution = 'D'
         else:
@@ -142,7 +148,7 @@ class StockPlugin(DisplayPlugin):
         return from_time, now, resolution
 
     def _fetch_stock_data(self):
-        """Fetch stock data from Finnhub API"""
+        """Fetch stock data from Finnhub API using the quote endpoint for free tier"""
         api_key = self._get_api_key()
         if not api_key:
             logger.error("No API key configured for stock data")
@@ -153,10 +159,6 @@ class StockPlugin(DisplayPlugin):
 
         logger.info(f"Using Finnhub API key: {api_key[:4]}...{api_key[-4:] if len(api_key) > 8 else ''}")
 
-        # Get time period parameters
-        from_time, to_time, resolution = self._get_time_period_params()
-        logger.info(f"Using time period: {self.config['time_period']}, resolution: {resolution}")
-
         # Fetch data for each symbol
         for i, symbol in enumerate(self.config.get('symbols', [])):
             if not symbol or len(symbol.strip()) == 0:
@@ -165,23 +167,20 @@ class StockPlugin(DisplayPlugin):
             # Clean up the symbol - make sure it's properly formatted (uppercase and trim spaces)
             symbol = symbol.strip().upper()
 
-            # Finnhub stock candles API URL
-            url = f"https://finnhub.io/api/v1/stock/candle"
+            # FIXED: Instead of using the stock/candle endpoint which requires premium,
+            # now using the quote endpoint which is available in the free tier
+            url = "https://finnhub.io/api/v1/quote"
             params = {
                 'symbol': symbol,
-                'resolution': resolution,
-                'from': from_time,
-                'to': to_time,
                 'token': api_key
             }
 
-            logger.info(f"Fetching stock data for {symbol} with resolution {resolution}")
+            logger.info(f"Fetching stock data for {symbol} using quote endpoint")
 
             try:
                 # Add timeout and headers for better API behavior
                 headers = {
-                    'User-Agent': 'InfoCube Stock Display/1.0',
-                    'X-Finnhub-Token': api_key
+                    'User-Agent': 'InfoCube Stock Display/1.0'
                 }
 
                 response = requests.get(
@@ -203,37 +202,37 @@ class StockPlugin(DisplayPlugin):
 
                 data = response.json()
 
-                # Check for error in response
-                if data.get('s') == 'no_data':
-                    logger.error(f"No data available for {symbol}")
-                    self.stock_error[symbol] = "No data available"
-                    continue
+                # Extract needed data from quote endpoint
+                current_price = data.get('c', 0)
+                previous_close = data.get('pc', 0)
+                
+                # Calculate change
+                price_change = current_price - previous_close
+                
+                # For quote endpoint, we don't get a time series, so we'll create a simplified one
+                # with just two points - yesterday and today
+                prices = [previous_close, current_price]
 
-                if data.get('s') != 'ok':
-                    logger.error(f"API Error for {symbol}: {data.get('error', 'Unknown error')}")
-                    self.stock_error[symbol] = data.get('error', 'Unknown error')
-                    continue
-
-                # Extract close prices
-                close_prices = data.get('c', [])
-
-                if not close_prices:
+                if current_price == 0:
                     logger.error(f"No price data found for {symbol}")
                     self.stock_error[symbol] = "No price data"
                     continue
 
                 # Success - store data
                 self.stock_data[symbol] = {
-                    'prices': close_prices,
-                    'change': close_prices[-1] - close_prices[0] if len(close_prices) > 1 else 0,
-                    'current': close_prices[-1]
+                    'prices': prices,
+                    'change': price_change,
+                    'current': current_price
                 }
 
-                logger.info(f"Successfully loaded stock data for {symbol}: current price = {close_prices[-1]}, change = {close_prices[-1] - close_prices[0] if len(close_prices) > 1 else 0}")
+                logger.info(f"Successfully loaded stock data for {symbol}: current price = {current_price}, previous close = {previous_close}, change = {price_change}")
 
                 # Clear any previous error
                 if symbol in self.stock_error:
                     del self.stock_error[symbol]
+
+                # Add a small delay between requests to avoid rate limiting
+                time.sleep(0.5)
 
             except Exception as e:
                 import traceback
@@ -254,7 +253,7 @@ class StockPlugin(DisplayPlugin):
         draw = ImageDraw.Draw(image)
 
         # Define section sizes
-        # Left side: 12 pixels for stock names and current prices
+        # Left side: 14 pixels for stock names and current prices
         # Right side: remaining width for graphs
         left_width = 14
         graph_width = width - left_width
@@ -267,21 +266,6 @@ class StockPlugin(DisplayPlugin):
             # No valid stock data available
             self.combined_image = image
             return
-
-        # Find global min/max for all stocks to use consistent scale
-        all_prices = []
-        for symbol in valid_symbols:
-            all_prices.extend(self.stock_data[symbol]['prices'])
-
-        min_price = min(all_prices) if all_prices else 0
-        max_price = max(all_prices) if all_prices else 100
-        price_range = max_price - min_price
-
-        # Ensure a minimum range to prevent division by zero
-        if price_range < 0.01:
-            price_range = 0.01
-
-        logger.info(f"Combined graph price range: min={min_price}, max={max_price}, range={price_range}")
 
         # Draw time period indicator at top right
         period_text = {
@@ -335,8 +319,17 @@ class StockPlugin(DisplayPlugin):
             if prices and len(prices) > 1:
                 points = []
                 for j, price in enumerate(prices):
-                    # Scale x position across the graph width
+                    # Scale x position across the graph width - note we only have 2 points now
                     x = left_width + (j * graph_width / (len(prices) - 1))
+
+                    # Calculate y position - we need to scale between min and max of prices
+                    min_price = min(prices)
+                    max_price = max(prices)
+                    price_range = max_price - min_price
+                    
+                    # Ensure a minimum range to prevent division by zero
+                    if price_range < 0.01:
+                        price_range = 0.01
 
                     # Scale y position to fit graph height (reverse Y axis)
                     y = 5 + (graph_height - ((price - min_price) / price_range * graph_height))

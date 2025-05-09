@@ -380,7 +380,7 @@ class StockPlugin(DisplayPlugin):
             # Layout parameters
             # Left section: Symbol, price, percent
             # Right section: Graph
-            left_section_width = 22  # Seems to match what's in your image
+            left_section_width = 32  # Seems to match what's in your image
             right_section_width = width - left_section_width
 
             # Fill left section with dark gray background

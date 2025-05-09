@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Redesigned stock plugin for 32x64 LED matrix display
+Fixed stock plugin for 32x64 LED matrix display
 """
 
 import time
@@ -17,11 +17,7 @@ from .base_plugin import DisplayPlugin
 logger = logging.getLogger(__name__)
 
 class StockPlugin(DisplayPlugin):
-    """Plugin for displaying stock ticker information with visual graph
-    
-    Shows stock symbol, current price, change percentage, and a graph
-    with gradient fill in a clean, easy-to-read layout.
-    """
+    """Plugin for displaying stock ticker information with visual graph"""
 
     def __init__(self, matrix, config=None):
         super().__init__(matrix, config)
@@ -68,10 +64,8 @@ class StockPlugin(DisplayPlugin):
         # Load fonts
         try:
             self.font_small.LoadFont("resources/fonts/4x6.bdf")
-            self.font.LoadFont("resources/fonts/6x10.bdf")  # Try to load medium font first
-            if not self.font.height():  # If medium font loading failed
-                self.font.LoadFont("resources/fonts/7x13.bdf")  # Fall back to standard font
-            
+            self.font.LoadFont("resources/fonts/7x13.bdf")  # Fall back to standard font
+
             try:
                 self.font_large.LoadFont("resources/fonts/9x18.bdf")
             except:
@@ -195,48 +189,39 @@ class StockPlugin(DisplayPlugin):
                 price_change = current_price - previous_close
                 percent_change = (price_change / previous_close * 100) if previous_close > 0 else 0
 
-                # Create data points for the graph - generate a reasonable price sequence
-                # We want to simulate a day's worth of trading data
-                num_points = 24  # One point per hour
+                # Create data points for the graph
+                num_points = 40  # More points for a smoother graph
                 prices = []
 
                 # Use open/high/low/close to create a coherent price series
                 if open_price > 0 and high > 0 and low > 0 and current_price > 0:
-                    # Start with open price
-                    prices.append(open_price)
-                    
-                    # Add some intermediate points with randomization based on high/low
-                    mid_point = num_points // 2
-                    
-                    for j in range(1, num_points):
-                        if j < mid_point:
-                            # First half: move toward high or low
-                            if j % 2 == 0:
-                                # Move toward high
-                                t = j / mid_point  # 0 to 1
-                                price = open_price + (high - open_price) * t * 0.8
-                            else:
-                                # Move toward low
-                                t = j / mid_point  # 0 to 1
-                                price = open_price + (low - open_price) * t * 0.8
-                        else:
-                            # Second half: move toward close
-                            t = (j - mid_point) / (num_points - mid_point)  # 0 to 1
-                            
-                            # Target is previous price point + slope toward close
-                            prev_price = prices[-1]
-                            target = prev_price + (current_price - prev_price) * t
-                            
-                            # Add small random fluctuation
-                            price = target
-                        
-                        prices.append(price)
-                    
-                    # End with current price
-                    if prices[-1] != current_price:
-                        prices.append(current_price)
+                    # Generate a smooth price curve from open to close with reasonable variations
+                    prices = [open_price]
+
+                    # Divide the day into segments
+                    for i in range(1, num_points-1):
+                        # Linear interpolation with some variation
+                        t = i / (num_points - 1)
+
+                        # Base price (straight line from open to close)
+                        base_price = open_price + (current_price - open_price) * t
+
+                        # Add slight variation to make the line more interesting
+                        # Early in the day, tend toward low; middle of the day, tend toward high
+                        if t < 0.3:  # First third of the day
+                            target = base_price + (low - base_price) * 0.3
+                        elif t < 0.7:  # Middle of the day
+                            target = base_price + (high - base_price) * 0.3
+                        else:  # Last third of the day
+                            # Move toward closing price
+                            target = base_price
+
+                        prices.append(target)
+
+                    # Make sure the last price is the current price
+                    prices.append(current_price)
                 else:
-                    # Fallback with just placeholder data
+                    # Fallback with placeholder data
                     prices = [previous_close] * 5 + [current_price] * 5
 
                 if current_price == 0:
@@ -278,25 +263,21 @@ class StockPlugin(DisplayPlugin):
         self._create_stock_images()
         self.last_update = 0
 
-    def _create_dot_number(self, draw, number, x, y, color, size=1):
-        """
-        Draw a number using dot matrix style similar to LED display
-        
-        Args:
-            draw: PIL ImageDraw object
-            number: Number to draw (can be a string or number)
-            x: X position
-            y: Y position
-            color: RGB color tuple
-            size: Size multiplier for dots
-        """
-        # Convert to string
-        number = str(number)
-        
-        # Patterns for digits 0-9 and decimal point in 3x5 dot matrix
+    def _draw_pixel_text(self, draw, text, x, y, color, scaled=False):
+        """Draw text using LED-style pixel patterns"""
+        # Get the clean text (remove any formatting)
+        clean_text = text.replace('$', '')
+
+        # Configuration
+        dot_size = 2 if scaled else 1
+        dot_gap = 1 * dot_size
+        digit_width = 3 * dot_size
+        digit_height = 5 * dot_size
+
+        # Define 3x5 dot patterns for characters
         patterns = {
             '0': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
-            '1': [(1,0), (0,1), (1,1), (1,2), (1,3), (0,4), (1,4), (2,4)],
+            '1': [(1,0), (1,1), (1,2), (1,3), (1,4)],
             '2': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (0,3), (0,4), (1,4), (2,4)],
             '3': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
             '4': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (2,4)],
@@ -306,41 +287,72 @@ class StockPlugin(DisplayPlugin):
             '8': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
             '9': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
             '.': [(1,4)],
+            ',': [(1,3), (0,4)],
             '+': [(1,1), (0,2), (1,2), (2,2), (1,3)],
             '-': [(0,2), (1,2), (2,2)],
             '%': [(0,0), (2,0), (2,1), (1,2), (0,3), (0,4), (2,4)],
             ' ': []
         }
-        
-        # Spacing between characters (in addition to character width)
-        char_spacing = 1
-        
+
+        # Add letter patterns for stock symbols
+        patterns.update({
+            'A': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (2,4)],
+            'B': [(0,0), (1,0), (0,1), (2,1), (0,2), (1,2), (0,3), (2,3), (0,4), (1,4)],
+            'C': [(0,0), (1,0), (2,0), (0,1), (0,2), (0,3), (0,4), (1,4), (2,4)],
+            'D': [(0,0), (1,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4)],
+            'E': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (0,3), (0,4), (1,4), (2,4)],
+            'F': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (0,3), (0,4)],
+            'G': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            'H': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (2,4)],
+            'I': [(0,0), (1,0), (2,0), (1,1), (1,2), (1,3), (0,4), (1,4), (2,4)],
+            'J': [(2,0), (2,1), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            'K': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (0,3), (2,3), (0,4), (2,4)],
+            'L': [(0,0), (0,1), (0,2), (0,3), (0,4), (1,4), (2,4)],
+            'M': [(0,0), (2,0), (0,1), (1,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (2,4)],
+            'N': [(0,0), (2,0), (0,1), (1,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (2,4)],
+            'O': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            'P': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (0,4)],
+            'Q': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (1,3), (2,3), (1,4), (2,4)],
+            'R': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (0,3), (2,3), (0,4), (2,4)],
+            'S': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            'T': [(0,0), (1,0), (2,0), (1,1), (1,2), (1,3), (1,4)],
+            'U': [(0,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            'V': [(0,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (1,4)],
+            'W': [(0,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (1,3), (2,3), (0,4), (2,4)],
+            'X': [(0,0), (2,0), (0,1), (2,1), (1,2), (0,3), (2,3), (0,4), (2,4)],
+            'Y': [(0,0), (2,0), (0,1), (2,1), (1,2), (1,3), (1,4)],
+            'Z': [(0,0), (1,0), (2,0), (2,1), (1,2), (0,3), (0,4), (1,4), (2,4)]
+        })
+
+        # Position tracking
+        cursor_x = x
+
         # Draw each character
-        pos_x = x
-        for char in number:
-            # Get pattern for this character
-            char_pattern = patterns.get(char, patterns[' '])
-            
-            # Draw the pattern
-            for dx, dy in char_pattern:
-                # Calculate the actual pixel position
-                pixel_x = pos_x + dx * size
-                pixel_y = y + dy * size
-                
-                # Draw a dot of the specified size
-                if size == 1:
-                    draw.point((pixel_x, pixel_y), fill=color)
+        for char in clean_text:
+            char = char.upper()  # Convert to uppercase
+            pattern = patterns.get(char, [])
+
+            # Draw the dots for this character
+            for dx, dy in pattern:
+                px = cursor_x + dx * dot_size
+                py = y + dy * dot_size
+
+                # Draw a square for each dot
+                if dot_size == 1:
+                    # Single pixel
+                    draw.point((px, py), fill=color)
                 else:
+                    # Larger dot
                     draw.rectangle(
-                        [(pixel_x, pixel_y), (pixel_x + size - 1, pixel_y + size - 1)],
+                        [(px, py), (px + dot_size - 1, py + dot_size - 1)],
                         fill=color
                     )
-            
-            # Move to the next character position (3 + spacing dots wide)
-            pos_x += (3 + char_spacing) * size
-        
-        # Return the width of the drawn text
-        return pos_x - x - char_spacing * size  # Subtract the trailing space
+
+            # Move cursor to next character position
+            cursor_x += digit_width + dot_gap
+
+        # Return the width of the text
+        return cursor_x - x
 
     def _create_stock_images(self):
         """Create individual image for each stock"""
@@ -360,132 +372,90 @@ class StockPlugin(DisplayPlugin):
 
             # Determine colors based on price change
             price_change = stock_data['change']
-            percent_change = stock_data['percent_change']
             positive_change = price_change >= 0
-            
+
             # Set colors based on whether change is positive or negative
             primary_color = (0, 255, 0) if positive_change else (255, 0, 0)  # Green if up, red if down
-            light_color = (100, 255, 100) if positive_change else (255, 100, 100)  # Lighter version for gradient
-            
+
             # Layout parameters
-            # Left section (20-22 columns): Symbol, price, percent
-            # Right section (42-44 columns): Graph
-            
-            info_section_width = 22
-            graph_section_width = width - info_section_width
-            
-            # Draw a subtle vertical divider
-            draw.line([(info_section_width, 0), (info_section_width, height)], fill=(20, 20, 20), width=1)
-            
-            # 1. DRAW STOCK SYMBOL at the top of the info section
-            # Use regular text drawing for the symbol (big clear text)
-            symbol_pos_y = 2
-            symbol_text = symbol
-            # Use a 2x2 dot matrix for larger symbols
-            self._create_dot_number(draw, symbol_text, 2, symbol_pos_y, (255, 255, 255), size=2)
-            
-            # 2. DRAW CURRENT PRICE below the symbol
-            price_pos_y = 12
-            current_price = stock_data['current']
-            
-            # Format price with appropriate precision
-            if current_price < 10:
-                price_text = f"{current_price:.2f}"
-            elif current_price < 100:
-                price_text = f"{current_price:.1f}"
-            else:
-                price_text = f"{int(current_price)}"
-                
-            # Draw price with 2x2 dot matrix for better visibility
-            self._create_dot_number(draw, price_text, 2, price_pos_y, primary_color, size=2)
-            
-            # 3. DRAW PERCENTAGE CHANGE at the bottom of info section
-            percent_pos_y = 22
-            percent_str = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
-            
-            # Draw percentage with 1x1 dot matrix (smaller)
-            self._create_dot_number(draw, percent_str, 2, percent_pos_y, primary_color, size=1)
-            
-            # 4. DRAW THE GRAPH in the right section
-            graph_x_start = info_section_width + 1
-            graph_y_start = 0
-            graph_width = graph_section_width - 1
-            graph_height = height
-            
-            # Get price data for graphing
+            # Left section: Symbol, price, percent
+            # Right section: Graph
+            left_section_width = 22  # Seems to match what's in your image
+            right_section_width = width - left_section_width
+
+            # Draw divider line (blue like in your image)
+            divider_color = (0, 128, 255)  # Light blue
+            for y in range(height):
+                draw.point((left_section_width, y), fill=divider_color)
+
+            # 1. Draw stock symbol in the top left
+            # Scale up the text for better readability
+            self._draw_pixel_text(draw, symbol, 2, 2, (255, 255, 255), scaled=True)
+
+            # 2. Draw price with scaled-up text
+            price = stock_data['current']
+            price_text = f"{price:.1f}"
+            if price < 10:
+                price_text = f"{price:.2f}"
+            elif price >= 100:
+                price_text = f"{int(price)}"
+
+            self._draw_pixel_text(draw, price_text, 2, 11, primary_color, scaled=True)
+
+            # 3. Draw percent change
+            percent_change = stock_data['percent_change']
+            percent_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
+            self._draw_pixel_text(draw, percent_text, 2, 22, primary_color, scaled=False)
+
+            # 4. Draw the graph on the right side
+            graph_x_start = left_section_width + 1
+            graph_width = right_section_width - 1
+
+            # Get price data
             prices = stock_data['prices']
-            
             if len(prices) > 1:
-                # Find min/max for scaling
+                # Find min/max for proper scaling
                 min_price = min(prices)
                 max_price = max(prices)
+
+                # Add buffer to avoid graph touching the edges
                 price_range = max_price - min_price
-                
-                # Ensure minimum range
                 if price_range < 0.01:
                     price_range = 0.01
-                
-                # Add buffer to avoid edges
-                buffer = price_range * 0.05
-                min_price = min_price - buffer
-                max_price = max_price + buffer
+
+                buffer = price_range * 0.1
+                min_price -= buffer
+                max_price += buffer
                 price_range = max_price - min_price
-                
-                # Create points for the line
+
+                # Create horizontal lines at equal intervals (like in your image)
+                num_lines = 6
+                for i in range(num_lines):
+                    y_pos = i * (height / (num_lines - 1))
+
+                    # Draw each point in the line
+                    for x in range(graph_x_start, width):
+                        draw.point((x, int(y_pos)), fill=primary_color)
+
+                # Calculate points for the line graph
                 points = []
                 for i, price in enumerate(prices):
-                    # Scale x across graph width
+                    # Calculate x position
                     x = graph_x_start + int(i * graph_width / (len(prices) - 1))
-                    
-                    # Scale y (inverted, since y increases downward)
-                    y = graph_y_start + int(graph_height - ((price - min_price) / price_range * graph_height))
-                    
-                    # Ensure within bounds
-                    y = max(graph_y_start, min(graph_y_start + graph_height - 1, y))
-                    
+
+                    # Calculate y position (invert y axis)
+                    normalized = (price - min_price) / price_range
+                    y = height - int(normalized * height)
+
+                    # Ensure y is within bounds
+                    y = max(1, min(height - 1, y))
+
                     points.append((x, y))
-                
-                # Create polygon for fill
-                fill_points = list(points)
-                # Add bottom corners to complete
-                fill_points.append((graph_x_start + graph_width, graph_y_start + graph_height))
-                fill_points.append((graph_x_start, graph_y_start + graph_height))
-                
-                # Draw a gradient-like fill under the graph line
-                # Simple approach: Draw 10 polygons with decreasing height and opacity
-                for i in range(10):
-                    level = i / 10.0  # 0.0 to 0.9
-                    
-                    # Calculate y position for this level (0=bottom, 1=top)
-                    level_y = graph_y_start + graph_height - level * graph_height
-                    
-                    # Create polygon points for this level
-                    level_points = []
-                    
-                    # Only include points above this level
-                    for x, y in points:
-                        if y <= level_y:
-                            level_points.append((x, y))
-                        else:
-                            level_points.append((x, level_y))
-                    
-                    # Complete the polygon if we have any points
-                    if level_points:
-                        level_points.append((graph_x_start + graph_width, level_y))
-                        level_points.append((graph_x_start, level_y))
-                        
-                        # Calculate alpha based on level (higher = more transparent)
-                        alpha = int(50 * (1.0 - level))
-                        r, g, b = primary_color
-                        
-                        # Draw this band - note we're creating an RGBA tuple
-                        fill_color = (r, g, b, alpha)
-                        draw.polygon(level_points, fill=fill_color)
-                
-                # Draw main graph line with increased width
+
+                # Draw line segments
                 for i in range(len(points) - 1):
-                    draw.line([points[i], points[i+1]], fill=primary_color, width=2)
-            
+                    draw.line([points[i], points[i+1]], fill=primary_color, width=1)
+
             # Store the completed image
             self.stock_images[symbol] = image
 

@@ -552,28 +552,6 @@ def update_brightness():
         flash(f"Error updating brightness: {e}", "error")
         return redirect(url_for('index'))
 
-@app.route('/')
-def index():
-    # Get the current status, mode, and plugins
-    is_running, service_status, current_mode, current_gif = get_current_status()
-    available_gifs = scan_gifs()
-    masked_api_key = get_masked_api_key()
-    plugins = get_plugins()
-
-    # Get the current brightness from config
-    config = load_config()
-
-    return render_template(
-        'index.html', 
-        current_mode=current_mode,
-        current_gif=current_gif,
-        available_gifs=available_gifs,
-        is_running=is_running,
-        service_status=service_status,
-        masked_api_key=masked_api_key,
-        plugins=plugins,
-        config=config  # Pass the entire config to the template
-    )
 
 @app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
 def plugin_config(plugin_name):

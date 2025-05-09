@@ -380,8 +380,8 @@ class StockPlugin(DisplayPlugin):
             # Layout parameters
             # Left section: Symbol, price, percent
             # Right section: Graph
-            left_section_width = 22  # Seems to match what's in your image
-            graph_start = left_section_width + 1  # Start graph 1 pixel after the divider
+            left_section_width = 31  # Seems to match what's in your image
+            right_section_width = width - left_section_width - 2
 
             # Fill left section with dark gray background
             for y in range(height):
@@ -389,7 +389,7 @@ class StockPlugin(DisplayPlugin):
                     draw.point((x, y), fill=(5, 5, 5))  # Dark gray
 
             # Draw divider line (blue like in your image)
-            divider_color = (0, 128, 255)  # Light blue
+            divider_color = (20, 20, 20)  # Light blue
             for y in range(height):
                 draw.point((left_section_width, y), fill=divider_color)
 
@@ -410,9 +410,12 @@ class StockPlugin(DisplayPlugin):
             # 3. Draw percent change
             percent_change = stock_data['percent_change']
             percent_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
-            self._draw_pixel_text(draw, percent_text, 2, 22, primary_color, scaled=False)
+            self._draw_pixel_text(draw, percent_text, 0, 22, primary_color, scaled=False)
 
             # 4. Draw the graph on the right side
+            graph_x_start = left_section_width + 1
+            graph_width = right_section_width - 1
+
             # Get price data
             prices = stock_data['prices']
             if len(prices) > 1:
@@ -430,32 +433,34 @@ class StockPlugin(DisplayPlugin):
                 max_price += buffer
                 price_range = max_price - min_price
 
-                # Calculate points for a SIMPLE line path (no interpolation)
-                # Use fewer points to avoid overlapping and creating boxes
-                num_display_points = 20  # Reduced number of points
+                # Calculate points for the line graph with more granularity
                 points = []
+                num_points = min(len(prices), 40)  # Use more points for smoother curve
 
-                for i in range(num_display_points):
-                    # Use evenly spaced samples from the prices array
-                    idx = i * (len(prices) - 1) // (num_display_points - 1)
+                for i in range(num_points):
+                    # Get price at this position
+                    idx = min(i * len(prices) // num_points, len(prices) - 1)
                     price = prices[idx]
 
-                    # Calculate x position - ensure points start after divider and are well-spaced
-                    x = graph_start + int(i * (width - graph_start) / (num_display_points - 1))
+                    # Calculate x position
+                    x = graph_x_start + int(i * graph_width / (num_points - 1))
 
-                    # Calculate y position (invert y axis) with proper scaling
+                    # Calculate y position (invert y axis)
                     normalized = (price - min_price) / price_range
-                    y = int((1.0 - normalized) * (height - 1))
+                    y = height - int(normalized * height)
 
                     # Ensure y is within bounds
-                    y = max(1, min(height - 2, y))
+                    y = max(1, min(height - 1, y))
 
                     points.append((x, y))
 
-                # ONLY draw individual points - NO connecting lines
-                # This avoids the overlapping box patterns
+                # Draw individual points first (for the traced line effect)
                 for x, y in points:
                     draw.point((x, y), fill=primary_color)
+
+                # Then draw line segments
+                for i in range(len(points) - 1):
+                    draw.line([points[i], points[i+1]], fill=primary_color, width=1)
 
             # Store the completed image
             self.stock_images[symbol] = image

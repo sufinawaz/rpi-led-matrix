@@ -1,51 +1,38 @@
 #!/usr/bin/env python
 """
-Enhanced stock plugin with rotating single-stock display and improved visuals for 32x64 LED matrix
+Redesigned stock plugin for 32x64 LED matrix display
 """
 
 import time
-from datetime import datetime, timedelta
 import os
 import json
 import requests
 import logging
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from rgbmatrix import graphics
 
 from .base_plugin import DisplayPlugin
-from text_renderer import TextRenderer
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 class StockPlugin(DisplayPlugin):
-    """Plugin for displaying stock ticker information
-
-    Configuration options:
-        symbols (list): List of stock symbols to display
-        api_key (str): API key for Finnhub
-        update_interval (int): How often to update stock data in seconds
-        rotation_interval (int): How long to display each stock in seconds
-        time_period (str): Time period to display ('day', 'week', '3month')
-        graph_colors (list): RGB color tuples for each stock graph
+    """Plugin for displaying stock ticker information with visual graph
+    
+    Shows stock symbol, current price, change percentage, and a graph
+    with gradient fill in a clean, easy-to-read layout.
     """
 
     def __init__(self, matrix, config=None):
         super().__init__(matrix, config)
         self.name = "stock"
-        self.description = "Stock ticker display"
+        self.description = "Stock ticker display with visual graph"
 
         # Default configuration
         self.config.setdefault('symbols', ['AAPL', 'MSFT', 'AMZN'])
         self.config.setdefault('api_key', '')
         self.config.setdefault('update_interval', 900)  # 15 minutes by default
-        self.config.setdefault('rotation_interval', 4)  # 4 seconds per stock (changed from 2)
-        self.config.setdefault('time_period', 'day')
-        self.config.setdefault('graph_colors', [
-            [0, 255, 0],  # Green
-            [0, 191, 255],  # Deep sky blue
-            [255, 165, 0]  # Orange
-        ])
+        self.config.setdefault('rotation_interval', 4)  # 4 seconds per stock
 
         # Internal state
         self.last_update = 0
@@ -61,80 +48,37 @@ class StockPlugin(DisplayPlugin):
         self.font_small = graphics.Font()
         self.font_large = graphics.Font()
 
-        # Text renderer
-        self.text_renderer = None
-
         # Colors
         self.colors = {
             'white': graphics.Color(255, 255, 255),
             'green': graphics.Color(0, 255, 0),
+            'light_green': graphics.Color(180, 255, 180),
             'red': graphics.Color(255, 0, 0),
+            'light_red': graphics.Color(255, 180, 180),
             'blue': graphics.Color(0, 191, 255),
             'orange': graphics.Color(255, 165, 0),
             'yellow': graphics.Color(255, 255, 0),
             'grey': graphics.Color(150, 150, 150),
-            'dark_grey': graphics.Color(30, 30, 30),
+            'dark_grey': graphics.Color(50, 50, 50),
             'error': graphics.Color(255, 0, 0)
         }
-
-    def _draw_tiny_char(self, draw, char, x, y, color):
-        """
-        Draw a single character in a tiny 3x5 pixel font
-        
-        Args:
-            draw: PIL ImageDraw object
-            char: Character to draw
-            x: X position
-            y: Y position
-            color: RGB color tuple
-        """
-        # Simple pixel patterns for a 3x5 font
-        patterns = {
-            '0': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
-            '1': [(1,0), (0,1), (1,1), (1,2), (1,3), (0,4), (1,4), (2,4)],
-            '2': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (0,3), (0,4), (1,4), (2,4)],
-            '3': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
-            '4': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (2,4)],
-            '5': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
-            '6': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
-            '7': [(0,0), (1,0), (2,0), (2,1), (1,2), (1,3), (1,4)],
-            '8': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
-            '9': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
-            '.': [(1,4)],
-            '-': [(0,2), (1,2), (2,2)],
-            '+': [(1,1), (0,2), (1,2), (2,2), (1,3)],
-            '%': [(0,0), (2,0), (2,1), (1,2), (0,3), (0,4), (2,4)],
-            '$': [(1,0), (0,1), (1,1), (2,1), (1,2), (1,3), (0,4), (1,4), (2,4), (1,5)],
-            ' ': []
-        }
-        
-        # Default pattern for unrecognized characters
-        default_pattern = [(1,1), (1,2), (1,3)]
-        
-        # Get the pattern for this character
-        pattern = patterns.get(char, default_pattern)
-        
-        # Draw the pixels
-        for dx, dy in pattern:
-            draw.point((x + dx, y + dy), fill=color)
 
     def setup(self):
         """Set up the stock plugin"""
         # Load fonts
         try:
             self.font_small.LoadFont("resources/fonts/4x6.bdf")
-            self.font.LoadFont("resources/fonts/7x13.bdf")
-            # Try to load a larger font
+            self.font.LoadFont("resources/fonts/6x10.bdf")  # Try to load medium font first
+            if not self.font.height():  # If medium font loading failed
+                self.font.LoadFont("resources/fonts/7x13.bdf")  # Fall back to standard font
+            
             try:
                 self.font_large.LoadFont("resources/fonts/9x18.bdf")
             except:
-                logger.warning("9x18 font not available, using 7x13 instead")
+                logger.warning("9x18 font not available, using standard font instead")
                 self.font_large = self.font
         except Exception as e:
             logger.error(f"Error loading fonts: {e}")
-
-        # Initialize text renderer
-        self.text_renderer = TextRenderer(self.matrix)
 
         # Check configuration
         logger.info(f"Stock plugin configuration: {self.config}")
@@ -182,29 +126,6 @@ class StockPlugin(DisplayPlugin):
             logger.error(f"Error reading config.json for API key: {e}")
 
         return ''
-
-    def _get_time_period_params(self):
-        """Get the time period parameters for Finnhub API"""
-        now = int(time.time())
-
-        if self.config['time_period'] == 'day':
-            # One day of data
-            from_time = now - 7 * 24 * 60 * 60
-            resolution = 'D'
-        elif self.config['time_period'] == 'week':
-            # One week of data
-            from_time = now - 7 * 24 * 60 * 60
-            resolution = 'D'
-        elif self.config['time_period'] == '3month':
-            # Three months of data
-            from_time = now - 90 * 24 * 60 * 60
-            resolution = 'D'
-        else:
-            # Default to daily data for one week
-            from_time = now - 7 * 24 * 60 * 60
-            resolution = 'D'
-
-        return from_time, now, resolution
 
     def _fetch_stock_data(self):
         """Fetch stock data from Finnhub API using the quote endpoint for free tier"""
@@ -257,7 +178,7 @@ class StockPlugin(DisplayPlugin):
                 # Log response details if error occurs
                 if response.status_code != 200:
                     logger.error(f"API error for {symbol}: HTTP {response.status_code}")
-                    logger.error(f"Response content: {response.text[:200]}")  # Log first 200 chars
+                    logger.error(f"Response content: {response.text[:200]}")
                     self.stock_error[symbol] = f"API error: HTTP {response.status_code}"
                     continue
 
@@ -274,28 +195,49 @@ class StockPlugin(DisplayPlugin):
                 price_change = current_price - previous_close
                 percent_change = (price_change / previous_close * 100) if previous_close > 0 else 0
 
-                # Create more data points for a smoother graph
-                # We'll create a simple approximation by interpolating between open and close
-                num_points = 20  # Increased for smoother graph
+                # Create data points for the graph - generate a reasonable price sequence
+                # We want to simulate a day's worth of trading data
+                num_points = 24  # One point per hour
                 prices = []
 
-                # Start with previous close
-                prices.append(previous_close)
-
-                # Interpolate between open and current price
-                for j in range(1, num_points-1):
-                    t = j / (num_points-1)
-                    # Add some variation to make the graph look more interesting
-                    # by using high and low as control points
-                    if j < num_points/2:
-                        # First half: interpolate between open and high/low
-                        prices.append(open_price + (high - open_price) * t * 2)
-                    else:
-                        # Second half: interpolate between high/low and close
-                        prices.append(high + (current_price - high) * (t*2-1))
-
-                # End with current price
-                prices.append(current_price)
+                # Use open/high/low/close to create a coherent price series
+                if open_price > 0 and high > 0 and low > 0 and current_price > 0:
+                    # Start with open price
+                    prices.append(open_price)
+                    
+                    # Add some intermediate points with randomization based on high/low
+                    mid_point = num_points // 2
+                    
+                    for j in range(1, num_points):
+                        if j < mid_point:
+                            # First half: move toward high or low
+                            if j % 2 == 0:
+                                # Move toward high
+                                t = j / mid_point  # 0 to 1
+                                price = open_price + (high - open_price) * t * 0.8
+                            else:
+                                # Move toward low
+                                t = j / mid_point  # 0 to 1
+                                price = open_price + (low - open_price) * t * 0.8
+                        else:
+                            # Second half: move toward close
+                            t = (j - mid_point) / (num_points - mid_point)  # 0 to 1
+                            
+                            # Target is previous price point + slope toward close
+                            prev_price = prices[-1]
+                            target = prev_price + (current_price - prev_price) * t
+                            
+                            # Add small random fluctuation
+                            price = target
+                        
+                        prices.append(price)
+                    
+                    # End with current price
+                    if prices[-1] != current_price:
+                        prices.append(current_price)
+                else:
+                    # Fallback with just placeholder data
+                    prices = [previous_close] * 5 + [current_price] * 5
 
                 if current_price == 0:
                     logger.error(f"No price data found for {symbol}")
@@ -336,6 +278,70 @@ class StockPlugin(DisplayPlugin):
         self._create_stock_images()
         self.last_update = 0
 
+    def _create_dot_number(self, draw, number, x, y, color, size=1):
+        """
+        Draw a number using dot matrix style similar to LED display
+        
+        Args:
+            draw: PIL ImageDraw object
+            number: Number to draw (can be a string or number)
+            x: X position
+            y: Y position
+            color: RGB color tuple
+            size: Size multiplier for dots
+        """
+        # Convert to string
+        number = str(number)
+        
+        # Patterns for digits 0-9 and decimal point in 3x5 dot matrix
+        patterns = {
+            '0': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '1': [(1,0), (0,1), (1,1), (1,2), (1,3), (0,4), (1,4), (2,4)],
+            '2': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (0,3), (0,4), (1,4), (2,4)],
+            '3': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '4': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (2,4)],
+            '5': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '6': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '7': [(0,0), (1,0), (2,0), (2,1), (1,2), (1,3), (1,4)],
+            '8': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '9': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '.': [(1,4)],
+            '+': [(1,1), (0,2), (1,2), (2,2), (1,3)],
+            '-': [(0,2), (1,2), (2,2)],
+            '%': [(0,0), (2,0), (2,1), (1,2), (0,3), (0,4), (2,4)],
+            ' ': []
+        }
+        
+        # Spacing between characters (in addition to character width)
+        char_spacing = 1
+        
+        # Draw each character
+        pos_x = x
+        for char in number:
+            # Get pattern for this character
+            char_pattern = patterns.get(char, patterns[' '])
+            
+            # Draw the pattern
+            for dx, dy in char_pattern:
+                # Calculate the actual pixel position
+                pixel_x = pos_x + dx * size
+                pixel_y = y + dy * size
+                
+                # Draw a dot of the specified size
+                if size == 1:
+                    draw.point((pixel_x, pixel_y), fill=color)
+                else:
+                    draw.rectangle(
+                        [(pixel_x, pixel_y), (pixel_x + size - 1, pixel_y + size - 1)],
+                        fill=color
+                    )
+            
+            # Move to the next character position (3 + spacing dots wide)
+            pos_x += (3 + char_spacing) * size
+        
+        # Return the width of the drawn text
+        return pos_x - x - char_spacing * size  # Subtract the trailing space
+
     def _create_stock_images(self):
         """Create individual image for each stock"""
         width = self.matrix.width
@@ -352,108 +358,135 @@ class StockPlugin(DisplayPlugin):
 
             stock_data = self.stock_data[symbol]
 
-            # Get color based on whether the stock is up or down
-            change = stock_data['change']
-            color = (0, 255, 0) if change >= 0 else (255, 0, 0)  # Green if positive, red if negative
-
-            # Draw stock symbol in upper left (large font)
-            symbol_font = ImageFont.load_default()
-            symbol_position = (2, 2)
-            draw.text(symbol_position, symbol, fill=(255, 255, 255), font=symbol_font)
-
-            # Format price with appropriate precision based on magnitude
-            current_price = stock_data['current']
-            if current_price < 10:
-                price_text = f"${current_price:.3f}"
-            elif current_price < 100:
-                price_text = f"${current_price:.2f}"
-            else:
-                price_text = f"${current_price:.1f}"
-
-            # Use a much smaller font size for the price
-            price_position = (width - len(price_text) * 4 - 2, 2)  # Right-aligned with smaller font
-            # Draw text in a very small size - 4x6 pixels per character
-            for i, char in enumerate(price_text):
-                x = price_position[0] + i * 4
-                y = price_position[1]
-                # Draw a tiny version of each character
-                self._draw_tiny_char(draw, char, x, y, color)
-
-            # Draw percent change text with outline for visibility
+            # Determine colors based on price change
+            price_change = stock_data['change']
             percent_change = stock_data['percent_change']
-            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"  # Reduced precision
+            positive_change = price_change >= 0
             
-            # Position for change text at bottom right
-            change_position = (width - len(change_text) * 4 - 2, height - 7)  # Bottom right
+            # Set colors based on whether change is positive or negative
+            primary_color = (0, 255, 0) if positive_change else (255, 0, 0)  # Green if up, red if down
+            light_color = (100, 255, 100) if positive_change else (255, 100, 100)  # Lighter version for gradient
             
-            # Draw outline first (black border around text)
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx != 0 or dy != 0:  # Skip the center
-                        for i, char in enumerate(change_text):
-                            x = change_position[0] + i * 4 + dx
-                            y = change_position[1] + dy
-                            self._draw_tiny_char(draw, char, x, y, (0, 0, 0))
+            # Layout parameters
+            # Left section (20-22 columns): Symbol, price, percent
+            # Right section (42-44 columns): Graph
             
-            # Then draw the text itself
-            for i, char in enumerate(change_text):
-                x = change_position[0] + i * 4
-                y = change_position[1]
-                self._draw_tiny_char(draw, char, x, y, color)
-
-            # Draw graph taking up the lower part of the screen
-            graph_y_start = 18  # Start below the text
-            graph_height = height - graph_y_start - 1  # Leave 1 pixel margin at bottom
-
+            info_section_width = 22
+            graph_section_width = width - info_section_width
+            
+            # Draw a subtle vertical divider
+            draw.line([(info_section_width, 0), (info_section_width, height)], fill=(20, 20, 20), width=1)
+            
+            # 1. DRAW STOCK SYMBOL at the top of the info section
+            # Use regular text drawing for the symbol (big clear text)
+            symbol_pos_y = 2
+            symbol_text = symbol
+            # Use a 2x2 dot matrix for larger symbols
+            self._create_dot_number(draw, symbol_text, 2, symbol_pos_y, (255, 255, 255), size=2)
+            
+            # 2. DRAW CURRENT PRICE below the symbol
+            price_pos_y = 12
+            current_price = stock_data['current']
+            
+            # Format price with appropriate precision
+            if current_price < 10:
+                price_text = f"{current_price:.2f}"
+            elif current_price < 100:
+                price_text = f"{current_price:.1f}"
+            else:
+                price_text = f"{int(current_price)}"
+                
+            # Draw price with 2x2 dot matrix for better visibility
+            self._create_dot_number(draw, price_text, 2, price_pos_y, primary_color, size=2)
+            
+            # 3. DRAW PERCENTAGE CHANGE at the bottom of info section
+            percent_pos_y = 22
+            percent_str = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
+            
+            # Draw percentage with 1x1 dot matrix (smaller)
+            self._create_dot_number(draw, percent_str, 2, percent_pos_y, primary_color, size=1)
+            
+            # 4. DRAW THE GRAPH in the right section
+            graph_x_start = info_section_width + 1
+            graph_y_start = 0
+            graph_width = graph_section_width - 1
+            graph_height = height
+            
+            # Get price data for graphing
             prices = stock_data['prices']
-
-            if prices and len(prices) > 1:
-                # Find min and max for scaling
+            
+            if len(prices) > 1:
+                # Find min/max for scaling
                 min_price = min(prices)
                 max_price = max(prices)
                 price_range = max_price - min_price
-
-                # Ensure a minimum range to prevent division by zero
+                
+                # Ensure minimum range
                 if price_range < 0.01:
                     price_range = 0.01
-                    
-                # Increase the range slightly to prevent graph from touching top and bottom
+                
+                # Add buffer to avoid edges
                 buffer = price_range * 0.05
-                effective_min = min_price - buffer
-                effective_max = max_price + buffer
-                effective_range = effective_max - effective_min
-
-                # Calculate points for the graph
+                min_price = min_price - buffer
+                max_price = max_price + buffer
+                price_range = max_price - min_price
+                
+                # Create points for the line
                 points = []
-                for j, price in enumerate(prices):
-                    # Scale x position across the width
-                    x = int(j * width / (len(prices) - 1))
-
-                    # Scale y position to fit graph height (reverse Y axis)
-                    # Use effective range with buffer to prevent touching edges
-                    y = graph_y_start + int(graph_height - ((price - effective_min) / effective_range * graph_height))
+                for i, price in enumerate(prices):
+                    # Scale x across graph width
+                    x = graph_x_start + int(i * graph_width / (len(prices) - 1))
                     
-                    # Ensure y stays within bounds
-                    y = max(graph_y_start, min(graph_y_start + graph_height, y))
+                    # Scale y (inverted, since y increases downward)
+                    y = graph_y_start + int(graph_height - ((price - min_price) / price_range * graph_height))
+                    
+                    # Ensure within bounds
+                    y = max(graph_y_start, min(graph_y_start + graph_height - 1, y))
                     
                     points.append((x, y))
                 
-                # Create a filled polygon for the area under the graph line
+                # Create polygon for fill
                 fill_points = list(points)
-                # Add bottom right and bottom left corners to complete the polygon
-                fill_points.append((width-1, graph_y_start + graph_height))
-                fill_points.append((0, graph_y_start + graph_height))
+                # Add bottom corners to complete
+                fill_points.append((graph_x_start + graph_width, graph_y_start + graph_height))
+                fill_points.append((graph_x_start, graph_y_start + graph_height))
                 
-                # Fill the polygon with a solid color using low opacity
-                r, g, b = color
-                fill_color = (r, g, b, 40)  # Low opacity solid fill (easier to see)
-                draw.polygon(fill_points, fill=fill_color)
+                # Draw a gradient-like fill under the graph line
+                # Simple approach: Draw 10 polygons with decreasing height and opacity
+                for i in range(10):
+                    level = i / 10.0  # 0.0 to 0.9
+                    
+                    # Calculate y position for this level (0=bottom, 1=top)
+                    level_y = graph_y_start + graph_height - level * graph_height
+                    
+                    # Create polygon points for this level
+                    level_points = []
+                    
+                    # Only include points above this level
+                    for x, y in points:
+                        if y <= level_y:
+                            level_points.append((x, y))
+                        else:
+                            level_points.append((x, level_y))
+                    
+                    # Complete the polygon if we have any points
+                    if level_points:
+                        level_points.append((graph_x_start + graph_width, level_y))
+                        level_points.append((graph_x_start, level_y))
+                        
+                        # Calculate alpha based on level (higher = more transparent)
+                        alpha = int(50 * (1.0 - level))
+                        r, g, b = primary_color
+                        
+                        # Draw this band - note we're creating an RGBA tuple
+                        fill_color = (r, g, b, alpha)
+                        draw.polygon(level_points, fill=fill_color)
                 
-                # Draw the actual graph line on top with full opacity and increased width
+                # Draw main graph line with increased width
                 for i in range(len(points) - 1):
-                    draw.line([points[i], points[i+1]], fill=color, width=2)
-
-            # Store the image
+                    draw.line([points[i], points[i+1]], fill=primary_color, width=2)
+            
+            # Store the completed image
             self.stock_images[symbol] = image
 
         # Reset current stock index if needed
@@ -472,8 +505,8 @@ class StockPlugin(DisplayPlugin):
             self.last_rotation = 0  # Reset rotation timer after refresh
             return
 
-        # Rotate stocks every X seconds (default 4 seconds)
-        if self.last_rotation >= self.config['rotation_interval'] and self.valid_symbols:
+        # Rotate stocks every few seconds
+        if self.last_rotation >= self.config['rotation_interval'] and len(self.valid_symbols) > 1:
             self.last_rotation = 0
             self.current_stock_idx = (self.current_stock_idx + 1) % len(self.valid_symbols)
 
@@ -492,25 +525,14 @@ class StockPlugin(DisplayPlugin):
                 return
             else:
                 # Fallback if image not found - should not happen
-                # Use TextRenderer for better text rendering
-                if self.text_renderer:
-                    self.text_renderer.draw_text(current_symbol, x=2, y=10, color=(255, 255, 255))
-                    
-                    stock_data = self.stock_data.get(current_symbol, {})
-                    if 'current' in stock_data:
-                        price_text = f"${stock_data['current']:.2f}"
-                        color = (0, 255, 0) if stock_data.get('change', 0) >= 0 else (255, 0, 0)
-                        self.text_renderer.draw_text(price_text, x=self.matrix.width-len(price_text)*7, y=10, color=color)
-                else:
-                    # Fallback to direct canvas drawing if TextRenderer not available
-                    graphics.DrawText(canvas, self.font, 2, 10, 
-                                    self.colors['white'], current_symbol)
+                graphics.DrawText(canvas, self.font, 2, 10, 
+                                self.colors['white'], current_symbol)
 
-                    stock_data = self.stock_data.get(current_symbol, {})
-                    if 'current' in stock_data:
-                        price_text = f"${stock_data['current']:.2f}"
-                        color = self.colors['green'] if stock_data.get('change', 0) >= 0 else self.colors['red']
-                        graphics.DrawText(canvas, self.font, self.matrix.width-len(price_text)*7, 10, color, price_text)
+                stock_data = self.stock_data.get(current_symbol, {})
+                if 'current' in stock_data:
+                    price_text = f"${stock_data['current']:.2f}"
+                    color = self.colors['green'] if stock_data.get('change', 0) >= 0 else self.colors['red']
+                    graphics.DrawText(canvas, self.font, 2, 20, color, price_text)
                 return
 
         # No valid stocks - show error message
@@ -519,14 +541,10 @@ class StockPlugin(DisplayPlugin):
 
         if not valid_symbols:
             # No stock symbols configured
-            if self.text_renderer:
-                self.text_renderer.draw_centered_text("No stocks", color=(255, 0, 0))
-                self.text_renderer.draw_text("Add in settings", x=2, y=25, color=(255, 255, 255))
-            else:
-                graphics.DrawText(canvas, self.font, 2, 16, 
-                                self.colors['error'], "No stocks")
-                graphics.DrawText(canvas, self.font_small, 2, 25, 
-                                self.colors['white'], "Add in settings")
+            graphics.DrawText(canvas, self.font, 2, 16, 
+                             self.colors['error'], "No stocks")
+            graphics.DrawText(canvas, self.font_small, 2, 25, 
+                             self.colors['white'], "Add in settings")
             return
 
         # Check for errors
@@ -534,25 +552,15 @@ class StockPlugin(DisplayPlugin):
 
         if has_errors:
             # Display error message
-            if self.text_renderer:
-                self.text_renderer.draw_text("Stock API", x=2, y=12, color=(255, 0, 0))
-                self.text_renderer.draw_text("Error", x=2, y=25, color=(255, 0, 0))
-                
-                # Display the specific error for debugging
-                first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
-                if len(first_error) > 20:
-                    first_error = first_error[:17] + "..."
-                self.text_renderer.draw_text(first_error, x=2, y=31, color=(255, 255, 255))
-            else:
-                graphics.DrawText(canvas, self.font, 2, 12, 
-                                self.colors['error'], "Stock API")
-                graphics.DrawText(canvas, self.font, 2, 25, 
-                                self.colors['error'], "Error")
+            graphics.DrawText(canvas, self.font, 2, 12, 
+                             self.colors['error'], "Stock API")
+            graphics.DrawText(canvas, self.font, 2, 25, 
+                             self.colors['error'], "Error")
 
-                # Display the specific error for debugging
-                first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
-                if len(first_error) > 20:
-                    first_error = first_error[:17] + "..."
-                graphics.DrawText(canvas, self.font_small, 2, 31, 
-                                self.colors['white'], first_error)
+            # Display the specific error for debugging
+            first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
+            if len(first_error) > 20:
+                first_error = first_error[:17] + "..."
+            graphics.DrawText(canvas, self.font_small, 2, 31, 
+                             self.colors['white'], first_error)
             return

@@ -383,6 +383,11 @@ class StockPlugin(DisplayPlugin):
             left_section_width = 22  # Seems to match what's in your image
             right_section_width = width - left_section_width
 
+            # Fill left section with dark gray background
+            for y in range(height):
+                for x in range(left_section_width):
+                    draw.point((x, y), fill=(15, 15, 15))  # Dark gray
+
             # Draw divider line (blue like in your image)
             divider_color = (0, 128, 255)  # Light blue
             for y in range(height):
@@ -400,7 +405,7 @@ class StockPlugin(DisplayPlugin):
             elif price >= 100:
                 price_text = f"{int(price)}"
 
-            self._draw_pixel_text(draw, price_text, 2, 11, primary_color, scaled=False)
+            self._draw_pixel_text(draw, price_text, 0, 11, primary_color, scaled=True)
 
             # 3. Draw percent change
             percent_change = stock_data['percent_change']
@@ -428,20 +433,17 @@ class StockPlugin(DisplayPlugin):
                 max_price += buffer
                 price_range = max_price - min_price
 
-                # Create horizontal lines at equal intervals (like in your image)
-                # num_lines = 6
-                # for i in range(num_lines):
-                #     y_pos = i * (height / (num_lines - 1))
-
-                #     # Draw each point in the line
-                #     for x in range(graph_x_start, width):
-                #         draw.point((x, int(y_pos)), fill=primary_color)
-
-                # Calculate points for the line graph
+                # Calculate points for the line graph with more granularity
                 points = []
-                for i, price in enumerate(prices):
+                num_points = min(len(prices), 40)  # Use more points for smoother curve
+
+                for i in range(num_points):
+                    # Get price at this position
+                    idx = min(i * len(prices) // num_points, len(prices) - 1)
+                    price = prices[idx]
+
                     # Calculate x position
-                    x = graph_x_start + int(i * graph_width / (len(prices) - 1))
+                    x = graph_x_start + int(i * graph_width / (num_points - 1))
 
                     # Calculate y position (invert y axis)
                     normalized = (price - min_price) / price_range
@@ -452,7 +454,11 @@ class StockPlugin(DisplayPlugin):
 
                     points.append((x, y))
 
-                # Draw line segments
+                # Draw individual points first (for the traced line effect)
+                for x, y in points:
+                    draw.point((x, y), fill=primary_color)
+
+                # Then draw line segments
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=primary_color, width=1)
 

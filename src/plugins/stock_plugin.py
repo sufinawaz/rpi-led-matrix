@@ -389,7 +389,7 @@ class StockPlugin(DisplayPlugin):
                     draw.point((x, y), fill=(5, 5, 5))  # Dark gray
 
             # Draw divider line (blue like in your image)
-            divider_color = (10, 10, 10)  # Light blue
+            divider_color = (20, 20, 20)  # Light blue
             for y in range(height):
                 draw.point((left_section_width, y), fill=divider_color)
 

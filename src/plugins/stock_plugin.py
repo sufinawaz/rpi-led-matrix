@@ -438,55 +438,18 @@ class StockPlugin(DisplayPlugin):
                     
                     points.append((x, y))
                 
-                # Create polygon points for filling under the graph
-                fill_points = list(points)  # Copy the graph points
+                # Create a filled polygon for the area under the graph line
+                fill_points = list(points)
                 # Add bottom right and bottom left corners to complete the polygon
                 fill_points.append((width-1, graph_y_start + graph_height))
                 fill_points.append((0, graph_y_start + graph_height))
                 
-                # Extract RGB components from the color
+                # Fill the polygon with a solid color using low opacity
                 r, g, b = color
+                fill_color = (r, g, b, 40)  # Low opacity solid fill (easier to see)
+                draw.polygon(fill_points, fill=fill_color)
                 
-                # First, draw a flat color with very low alpha as the base of the gradient
-                base_fill_color = (r, g, b, 10)  # Almost transparent base
-                draw.polygon(fill_points, fill=base_fill_color)
-                
-                # For the gradient effect, we'll create a series of gradient bands with 
-                # decreasing height and increasing opacity
-                num_bands = 10  # More bands for smoother gradient
-                
-                for i in range(num_bands):
-                    # Calculate the percentage from the bottom of the graph (0% at bottom, 100% at top)
-                    percentage = i / num_bands
-                    
-                    # Calculate the alpha value based on position (0 at bottom, 80% at top)
-                    alpha = int(80 * percentage)
-                    
-                    # Calculate the y-position for this band
-                    band_y = graph_y_start + graph_height - (percentage * graph_height)
-                    
-                    # Create band points - only include graph points above this y-level
-                    band_points = []
-                    
-                    for x, y in points:
-                        if y <= band_y:
-                            band_points.append((x, y))
-                        else:
-                            # For points below, use the band_y level
-                            band_points.append((x, band_y))
-                    
-                    # Complete the polygon
-                    if band_points:
-                        # Add right edge
-                        band_points.append((width-1, band_y))
-                        # Add left edge
-                        band_points.insert(0, (0, band_y))
-                        
-                        # Draw this band with its calculated opacity
-                        band_color = (r, g, b, alpha)
-                        draw.polygon(band_points, fill=band_color)
-                
-                # Draw the actual graph line on top at 100% opacity
+                # Draw the actual graph line on top with full opacity and increased width
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=color, width=2)
 

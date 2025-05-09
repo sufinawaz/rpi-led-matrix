@@ -316,12 +316,11 @@ class StockPlugin(DisplayPlugin):
             color = (0, 255, 0) if change >= 0 else (255, 0, 0)  # Green if positive, red if negative
 
             # Draw stock symbol in upper left (large font)
-            # Using PIL's ImageDraw for better control
             symbol_font = ImageFont.load_default()
             symbol_position = (2, 2)
             draw.text(symbol_position, symbol, fill=(255, 255, 255), font=symbol_font)
 
-            # Format price with appropriate precision based on magnitude (using smaller font)
+            # Format price with appropriate precision based on magnitude (using much smaller font)
             current_price = stock_data['current']
             if current_price < 10:
                 price_text = f"${current_price:.3f}"
@@ -330,20 +329,48 @@ class StockPlugin(DisplayPlugin):
             else:
                 price_text = f"${current_price:.1f}"
 
-            # Draw price in upper right with smaller font
-            small_font = ImageFont.load_default()  # Using default font which is smaller
-            price_width = len(price_text) * 5  # Smaller font = less width per character
-            price_position = (width - price_width - 2, 2)  # Adjusted for 32x64 matrix
-            draw.text(price_position, price_text, fill=color, font=small_font)
+            # Create a much smaller font size (approximately 4x5 pixels per character)
+            # We'll achieve this by having PIL render text at a larger size, then scale it down
+            try:
+                # Try to create a really tiny font
+                small_font = ImageFont.load_default().font_variant(size=8)  # Try to get a smaller variant if possible
+            except:
+                small_font = ImageFont.load_default()
 
-            # Draw percent change in bottom right corner with smaller font
+            # Create a temporary image to render the price text
+            text_img = Image.new('RGB', (width, height), (0, 0, 0))
+            text_draw = ImageDraw.Draw(text_img)
+            text_draw.text((0, 0), price_text, fill=color, font=small_font)
+            # Scale down the text image
+            text_img = text_img.resize((len(price_text) * 4, 6), Image.LANCZOS)
+
+            # Draw the price text in upper right
+            price_position = (width - text_img.width - 2, 2)  # Right-aligned with 2px margin
+            draw.bitmap(price_position, text_img, fill=color)
+
+            # Draw percent change in bottom right with a black outline for visibility
             percent_change = stock_data['percent_change']
-            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.2f}%"
+            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"  # Reduced precision to save space
 
-            # Position the change text at the bottom right
-            change_width = len(change_text) * 5  # Assuming small font
-            change_position = (width - change_width - 2, height - 10)  # Bottom right
-            draw.text(change_position, change_text, fill=color, font=small_font)
+            # Create a tiny version of the change text with outline
+            change_img = Image.new('RGB', (width, height), (0, 0, 0))
+            change_draw = ImageDraw.Draw(change_img)
+
+            # Draw text with outline by drawing the text multiple times with offsets
+            for offset_x in [-1, 0, 1]:
+                for offset_y in [-1, 0, 1]:
+                    if offset_x != 0 or offset_y != 0:  # Skip the center position
+                        change_draw.text((offset_x+5, offset_y+5), change_text, fill=(0, 0, 0), font=small_font)
+
+            # Draw the main text on top
+            change_draw.text((5, 5), change_text, fill=color, font=small_font)
+
+            # Scale down the text image
+            change_img = change_img.resize((len(change_text) * 4, 6), Image.LANCZOS)
+
+            # Position at bottom right
+            change_position = (width - change_img.width - 2, height - change_img.height - 2)
+            draw.bitmap(change_position, change_img, fill=None)
 
             # Draw graph taking up the lower part of the screen
             graph_y_start = 18  # Start below the text
@@ -382,40 +409,52 @@ class StockPlugin(DisplayPlugin):
 
                     points.append((x, y))
 
-                # Create polygon points for gradient fill under the graph
-                # Start with the last point on the graph
-                polygon_points = points.copy()
-                # Add bottom-right corner
-                polygon_points.append((width-1, graph_y_start + graph_height))
-                # Add bottom-left corner
-                polygon_points.append((0, graph_y_start + graph_height))
+                # Create polygon points for filling under the graph
+                fill_points = list(points)  # Copy the graph points
+                # Add bottom right and bottom left corners to complete the polygon
+                fill_points.append((width-1, graph_y_start + graph_height))
+                fill_points.append((0, graph_y_start + graph_height))
 
-                # Create a gradient fill under the graph line
-                # Extract RGB components from the color
-                r, g, b = color
+                # First, draw a flat color with very low alpha as the base of the gradient
+                base_fill_color = (*color, 10)  # Almost transparent base
+                draw.polygon(fill_points, fill=base_fill_color)
 
-                # Create several polygons with decreasing opacity for gradient effect
-                for i in range(5):
-                    # Calculate opacity for this level (decreasing as we go deeper)
-                    opacity = int(80 - i * 15)  # Start at 80% opacity, decrease by 15% each step
+                # For the gradient effect, we'll create a series of gradient bands with 
+                # decreasing height and increasing opacity
+                num_bands = 10  # More bands for smoother gradient
 
-                    # Calculate the y-offset for this gradient level
-                    y_offset = i * graph_height // 5
+                for i in range(num_bands):
+                    # Calculate the percentage from the bottom of the graph (0% at bottom, 100% at top)
+                    percentage = i / num_bands
 
-                    # Create modified polygon points with increasing y values
-                    modified_points = []
+                    # Calculate the alpha value based on position (0 at bottom, 80% at top)
+                    alpha = int(80 * percentage)
+
+                    # Calculate the y-position for this band
+                    band_y = graph_y_start + graph_height - (percentage * graph_height)
+
+                    # Create band points - only include graph points above this y-level
+                    band_points = []
+
                     for x, y in points:
-                        modified_points.append((x, min(y + y_offset, graph_y_start + graph_height)))
+                        if y <= band_y:
+                            band_points.append((x, y))
+                        else:
+                            # For points below, use the band_y level
+                            band_points.append((x, band_y))
 
-                    # Add bottom corners
-                    modified_points.append((width-1, graph_y_start + graph_height))
-                    modified_points.append((0, graph_y_start + graph_height))
+                    # Complete the polygon
+                    if band_points:
+                        # Add right edge
+                        band_points.append((width-1, band_y))
+                        # Add left edge
+                        band_points.insert(0, (0, band_y))
 
-                    # Fill polygon with semi-transparent color
-                    gradient_color = (r, g, b, opacity)
-                    draw.polygon(modified_points, fill=gradient_color)
+                        # Draw this band with its calculated opacity
+                        band_color = (*color, alpha)
+                        draw.polygon(band_points, fill=band_color)
 
-                # Draw the main graph line with appropriate color and increased thickness on top
+                # Draw the actual graph line on top at 100% opacity
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=color, width=2)
 

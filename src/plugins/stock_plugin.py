@@ -390,7 +390,7 @@ class StockPlugin(DisplayPlugin):
 
             # 1. Draw stock symbol in the top left
             # Scale up the text for better readability
-            self._draw_pixel_text(draw, symbol, 2, 2, (255, 255, 255), scaled=True)
+            self._draw_pixel_text(draw, symbol, 0, 0, (255, 255, 255), scaled=True)
 
             # 2. Draw price with scaled-up text
             price = stock_data['current']
@@ -400,12 +400,12 @@ class StockPlugin(DisplayPlugin):
             elif price >= 100:
                 price_text = f"{int(price)}"
 
-            self._draw_pixel_text(draw, price_text, 2, 11, primary_color, scaled=True)
+            self._draw_pixel_text(draw, price_text, 2, 11, primary_color, scaled=False)
 
             # 3. Draw percent change
             percent_change = stock_data['percent_change']
             percent_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
-            self._draw_pixel_text(draw, percent_text, 2, 22, primary_color, scaled=False)
+            self._draw_pixel_text(draw, percent_text, 0, 22, primary_color, scaled=False)
 
             # 4. Draw the graph on the right side
             graph_x_start = left_section_width + 1
@@ -429,13 +429,13 @@ class StockPlugin(DisplayPlugin):
                 price_range = max_price - min_price
 
                 # Create horizontal lines at equal intervals (like in your image)
-                num_lines = 6
-                for i in range(num_lines):
-                    y_pos = i * (height / (num_lines - 1))
+                # num_lines = 6
+                # for i in range(num_lines):
+                #     y_pos = i * (height / (num_lines - 1))
 
-                    # Draw each point in the line
-                    for x in range(graph_x_start, width):
-                        draw.point((x, int(y_pos)), fill=primary_color)
+                #     # Draw each point in the line
+                #     for x in range(graph_x_start, width):
+                #         draw.point((x, int(y_pos)), fill=primary_color)
 
                 # Calculate points for the line graph
                 points = []

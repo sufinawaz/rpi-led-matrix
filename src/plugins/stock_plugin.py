@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 from rgbmatrix import graphics
 
 from .base_plugin import DisplayPlugin
-from src.text_renderer import TextRenderer
+from text_renderer import TextRenderer
 
 # Set up logging
 logger = logging.getLogger(__name__)

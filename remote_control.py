@@ -512,6 +512,69 @@ def update_api_key():
         flash(f"Error updating API key: {e}", "error")
         return redirect(url_for('index'))
 
+@app.route('/update_brightness', methods=['POST'])
+def update_brightness():
+    """Update the LED matrix brightness"""
+    try:
+        brightness = int(request.form.get('brightness', 50))
+
+        # Ensure brightness is within valid range
+        brightness = max(1, min(100, brightness))
+
+        # Update in config file
+        config = load_config()
+        if "matrix" not in config:
+            config["matrix"] = {}
+
+        # Store previous brightness to detect changes
+        old_brightness = config["matrix"].get("brightness", 50)
+        config["matrix"]["brightness"] = brightness
+        save_config(config)
+
+        # If running with API, try to update brightness directly
+        try:
+            success = api_client.set_brightness(brightness)
+            if success:
+                flash(f"Brightness updated to {brightness}%", "success")
+                return redirect(url_for('index'))
+        except Exception as e:
+            logger.info(f"Could not update brightness via API: {e}")
+
+        # If API fails or is not available, restart the service to apply changes
+        if old_brightness != brightness:
+            # Restart service to apply new brightness
+            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+        flash(f"Brightness updated to {brightness}%", "success")
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error updating brightness: {e}")
+        flash(f"Error updating brightness: {e}", "error")
+        return redirect(url_for('index'))
+
+@app.route('/')
+def index():
+    # Get the current status, mode, and plugins
+    is_running, service_status, current_mode, current_gif = get_current_status()
+    available_gifs = scan_gifs()
+    masked_api_key = get_masked_api_key()
+    plugins = get_plugins()
+
+    # Get the current brightness from config
+    config = load_config()
+
+    return render_template(
+        'index.html', 
+        current_mode=current_mode,
+        current_gif=current_gif,
+        available_gifs=available_gifs,
+        is_running=is_running,
+        service_status=service_status,
+        masked_api_key=masked_api_key,
+        plugins=plugins,
+        config=config  # Pass the entire config to the template
+    )
+
 @app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
 def plugin_config(plugin_name):
     """Get or update plugin configuration"""

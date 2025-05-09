@@ -321,7 +321,7 @@ class StockPlugin(DisplayPlugin):
             symbol_position = (2, 2)
             draw.text(symbol_position, symbol, fill=(255, 255, 255), font=symbol_font)
 
-            # Format price with appropriate precision based on magnitude
+            # Format price with appropriate precision based on magnitude (using smaller font)
             current_price = stock_data['current']
             if current_price < 10:
                 price_text = f"${current_price:.3f}"
@@ -330,17 +330,20 @@ class StockPlugin(DisplayPlugin):
             else:
                 price_text = f"${current_price:.1f}"
 
-            # Draw price in upper right
-            price_position = (width - len(price_text) * 6 - 2, 2)  # Adjusted for 32x64 matrix
-            draw.text(price_position, price_text, fill=color, font=symbol_font)
+            # Draw price in upper right with smaller font
+            small_font = ImageFont.load_default()  # Using default font which is smaller
+            price_width = len(price_text) * 5  # Smaller font = less width per character
+            price_position = (width - price_width - 2, 2)  # Adjusted for 32x64 matrix
+            draw.text(price_position, price_text, fill=color, font=small_font)
 
-            # Draw percent change below the symbol (not the price) with smaller font
+            # Draw percent change in bottom right corner with smaller font
             percent_change = stock_data['percent_change']
             change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.2f}%"
-            
-            # Position the change text below the symbol
-            change_position = (2, 10)
-            draw.text(change_position, change_text, fill=color, font=symbol_font)
+
+            # Position the change text at the bottom right
+            change_width = len(change_text) * 5  # Assuming small font
+            change_position = (width - change_width - 2, height - 10)  # Bottom right
+            draw.text(change_position, change_text, fill=color, font=small_font)
 
             # Draw graph taking up the lower part of the screen
             graph_y_start = 18  # Start below the text
@@ -357,19 +360,14 @@ class StockPlugin(DisplayPlugin):
                 # Ensure a minimum range to prevent division by zero
                 if price_range < 0.01:
                     price_range = 0.01
-                    
+
                 # Increase the range slightly to prevent graph from touching top and bottom
                 buffer = price_range * 0.05
                 effective_min = min_price - buffer
                 effective_max = max_price + buffer
                 effective_range = effective_max - effective_min
 
-                # Draw subtle grid lines first (very dark to avoid the compressed look)
-                for k in range(1, 5):  # Fewer lines, more subtle
-                    mark_y = graph_y_start + int(graph_height * k / 5)
-                    draw.line([(0, mark_y), (width, mark_y)], fill=(10, 10, 15), width=1)  # Much darker
-
-                # Draw the graph line
+                # Calculate points for the graph
                 points = []
                 for j, price in enumerate(prices):
                     # Scale x position across the width
@@ -378,19 +376,48 @@ class StockPlugin(DisplayPlugin):
                     # Scale y position to fit graph height (reverse Y axis)
                     # Use effective range with buffer to prevent touching edges
                     y = graph_y_start + int(graph_height - ((price - effective_min) / effective_range * graph_height))
-                    
+
                     # Ensure y stays within bounds
                     y = max(graph_y_start, min(graph_y_start + graph_height, y))
-                    
+
                     points.append((x, y))
 
-                # Draw the line with appropriate color and increased thickness
+                # Create polygon points for gradient fill under the graph
+                # Start with the last point on the graph
+                polygon_points = points.copy()
+                # Add bottom-right corner
+                polygon_points.append((width-1, graph_y_start + graph_height))
+                # Add bottom-left corner
+                polygon_points.append((0, graph_y_start + graph_height))
+
+                # Create a gradient fill under the graph line
+                # Extract RGB components from the color
+                r, g, b = color
+
+                # Create several polygons with decreasing opacity for gradient effect
+                for i in range(5):
+                    # Calculate opacity for this level (decreasing as we go deeper)
+                    opacity = int(80 - i * 15)  # Start at 80% opacity, decrease by 15% each step
+
+                    # Calculate the y-offset for this gradient level
+                    y_offset = i * graph_height // 5
+
+                    # Create modified polygon points with increasing y values
+                    modified_points = []
+                    for x, y in points:
+                        modified_points.append((x, min(y + y_offset, graph_y_start + graph_height)))
+
+                    # Add bottom corners
+                    modified_points.append((width-1, graph_y_start + graph_height))
+                    modified_points.append((0, graph_y_start + graph_height))
+
+                    # Fill polygon with semi-transparent color
+                    gradient_color = (r, g, b, opacity)
+                    draw.polygon(modified_points, fill=gradient_color)
+
+                # Draw the main graph line with appropriate color and increased thickness on top
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=color, width=2)
-
-                # Draw reference price at bottom of graph (previous close)
-                ref_price = f"Prev: ${stock_data['previous_close']:.2f}"
-                draw.text((2, height - 8), ref_price, fill=(150, 150, 150), font=symbol_font)
 
             # Store the image
             self.stock_images[symbol] = image
@@ -434,7 +461,7 @@ class StockPlugin(DisplayPlugin):
                 # Use TextRenderer for better text rendering
                 if self.text_renderer:
                     self.text_renderer.draw_text(current_symbol, x=2, y=10, color=(255, 255, 255))
-                    
+
                     stock_data = self.stock_data.get(current_symbol, {})
                     if 'current' in stock_data:
                         price_text = f"${stock_data['current']:.2f}"
@@ -476,7 +503,7 @@ class StockPlugin(DisplayPlugin):
             if self.text_renderer:
                 self.text_renderer.draw_text("Stock API", x=2, y=12, color=(255, 0, 0))
                 self.text_renderer.draw_text("Error", x=2, y=25, color=(255, 0, 0))
-                
+
                 # Display the specific error for debugging
                 first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
                 if len(first_error) > 20:

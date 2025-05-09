@@ -77,6 +77,47 @@ class StockPlugin(DisplayPlugin):
             'error': graphics.Color(255, 0, 0)
         }
 
+    def _draw_tiny_char(self, draw, char, x, y, color):
+        """
+        Draw a single character in a tiny 3x5 pixel font
+        
+        Args:
+            draw: PIL ImageDraw object
+            char: Character to draw
+            x: X position
+            y: Y position
+            color: RGB color tuple
+        """
+        # Simple pixel patterns for a 3x5 font
+        patterns = {
+            '0': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '1': [(1,0), (0,1), (1,1), (1,2), (1,3), (0,4), (1,4), (2,4)],
+            '2': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (0,3), (0,4), (1,4), (2,4)],
+            '3': [(0,0), (1,0), (2,0), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '4': [(0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (2,4)],
+            '5': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '6': [(0,0), (1,0), (2,0), (0,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '7': [(0,0), (1,0), (2,0), (2,1), (1,2), (1,3), (1,4)],
+            '8': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (0,3), (2,3), (0,4), (1,4), (2,4)],
+            '9': [(0,0), (1,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (0,4), (1,4), (2,4)],
+            '.': [(1,4)],
+            '-': [(0,2), (1,2), (2,2)],
+            '+': [(1,1), (0,2), (1,2), (2,2), (1,3)],
+            '%': [(0,0), (2,0), (2,1), (1,2), (0,3), (0,4), (2,4)],
+            '$': [(1,0), (0,1), (1,1), (2,1), (1,2), (1,3), (0,4), (1,4), (2,4), (1,5)],
+            ' ': []
+        }
+        
+        # Default pattern for unrecognized characters
+        default_pattern = [(1,1), (1,2), (1,3)]
+        
+        # Get the pattern for this character
+        pattern = patterns.get(char, default_pattern)
+        
+        # Draw the pixels
+        for dx, dy in pattern:
+            draw.point((x + dx, y + dy), fill=color)
+
     def setup(self):
         """Set up the stock plugin"""
         # Load fonts
@@ -320,7 +361,7 @@ class StockPlugin(DisplayPlugin):
             symbol_position = (2, 2)
             draw.text(symbol_position, symbol, fill=(255, 255, 255), font=symbol_font)
 
-            # Format price with appropriate precision based on magnitude (using much smaller font)
+            # Format price with appropriate precision based on magnitude
             current_price = stock_data['current']
             if current_price < 10:
                 price_text = f"${current_price:.3f}"
@@ -329,48 +370,36 @@ class StockPlugin(DisplayPlugin):
             else:
                 price_text = f"${current_price:.1f}"
 
-            # Create a much smaller font size (approximately 4x5 pixels per character)
-            # We'll achieve this by having PIL render text at a larger size, then scale it down
-            try:
-                # Try to create a really tiny font
-                small_font = ImageFont.load_default().font_variant(size=8)  # Try to get a smaller variant if possible
-            except:
-                small_font = ImageFont.load_default()
+            # Use a much smaller font size for the price
+            price_position = (width - len(price_text) * 4 - 2, 2)  # Right-aligned with smaller font
+            # Draw text in a very small size - 4x6 pixels per character
+            for i, char in enumerate(price_text):
+                x = price_position[0] + i * 4
+                y = price_position[1]
+                # Draw a tiny version of each character
+                self._draw_tiny_char(draw, char, x, y, color)
 
-            # Create a temporary image to render the price text
-            text_img = Image.new('RGB', (width, height), (0, 0, 0))
-            text_draw = ImageDraw.Draw(text_img)
-            text_draw.text((0, 0), price_text, fill=color, font=small_font)
-            # Scale down the text image
-            text_img = text_img.resize((len(price_text) * 4, 6), Image.LANCZOS)
-
-            # Draw the price text in upper right
-            price_position = (width - text_img.width - 2, 2)  # Right-aligned with 2px margin
-            draw.bitmap(price_position, text_img, fill=color)
-
-            # Draw percent change in bottom right with a black outline for visibility
+            # Draw percent change text with outline for visibility
             percent_change = stock_data['percent_change']
-            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"  # Reduced precision to save space
-
-            # Create a tiny version of the change text with outline
-            change_img = Image.new('RGB', (width, height), (0, 0, 0))
-            change_draw = ImageDraw.Draw(change_img)
-
-            # Draw text with outline by drawing the text multiple times with offsets
-            for offset_x in [-1, 0, 1]:
-                for offset_y in [-1, 0, 1]:
-                    if offset_x != 0 or offset_y != 0:  # Skip the center position
-                        change_draw.text((offset_x+5, offset_y+5), change_text, fill=(0, 0, 0), font=small_font)
-
-            # Draw the main text on top
-            change_draw.text((5, 5), change_text, fill=color, font=small_font)
-
-            # Scale down the text image
-            change_img = change_img.resize((len(change_text) * 4, 6), Image.LANCZOS)
-
-            # Position at bottom right
-            change_position = (width - change_img.width - 2, height - change_img.height - 2)
-            draw.bitmap(change_position, change_img, fill=None)
+            change_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"  # Reduced precision
+            
+            # Position for change text at bottom right
+            change_position = (width - len(change_text) * 4 - 2, height - 7)  # Bottom right
+            
+            # Draw outline first (black border around text)
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx != 0 or dy != 0:  # Skip the center
+                        for i, char in enumerate(change_text):
+                            x = change_position[0] + i * 4 + dx
+                            y = change_position[1] + dy
+                            self._draw_tiny_char(draw, char, x, y, (0, 0, 0))
+            
+            # Then draw the text itself
+            for i, char in enumerate(change_text):
+                x = change_position[0] + i * 4
+                y = change_position[1]
+                self._draw_tiny_char(draw, char, x, y, color)
 
             # Draw graph taking up the lower part of the screen
             graph_y_start = 18  # Start below the text
@@ -387,7 +416,7 @@ class StockPlugin(DisplayPlugin):
                 # Ensure a minimum range to prevent division by zero
                 if price_range < 0.01:
                     price_range = 0.01
-
+                    
                 # Increase the range slightly to prevent graph from touching top and bottom
                 buffer = price_range * 0.05
                 effective_min = min_price - buffer
@@ -403,57 +432,60 @@ class StockPlugin(DisplayPlugin):
                     # Scale y position to fit graph height (reverse Y axis)
                     # Use effective range with buffer to prevent touching edges
                     y = graph_y_start + int(graph_height - ((price - effective_min) / effective_range * graph_height))
-
+                    
                     # Ensure y stays within bounds
                     y = max(graph_y_start, min(graph_y_start + graph_height, y))
-
+                    
                     points.append((x, y))
-
+                
                 # Create polygon points for filling under the graph
                 fill_points = list(points)  # Copy the graph points
                 # Add bottom right and bottom left corners to complete the polygon
                 fill_points.append((width-1, graph_y_start + graph_height))
                 fill_points.append((0, graph_y_start + graph_height))
-
+                
+                # Extract RGB components from the color
+                r, g, b = color
+                
                 # First, draw a flat color with very low alpha as the base of the gradient
-                base_fill_color = (*color, 10)  # Almost transparent base
+                base_fill_color = (r, g, b, 10)  # Almost transparent base
                 draw.polygon(fill_points, fill=base_fill_color)
-
+                
                 # For the gradient effect, we'll create a series of gradient bands with 
                 # decreasing height and increasing opacity
                 num_bands = 10  # More bands for smoother gradient
-
+                
                 for i in range(num_bands):
                     # Calculate the percentage from the bottom of the graph (0% at bottom, 100% at top)
                     percentage = i / num_bands
-
+                    
                     # Calculate the alpha value based on position (0 at bottom, 80% at top)
                     alpha = int(80 * percentage)
-
+                    
                     # Calculate the y-position for this band
                     band_y = graph_y_start + graph_height - (percentage * graph_height)
-
+                    
                     # Create band points - only include graph points above this y-level
                     band_points = []
-
+                    
                     for x, y in points:
                         if y <= band_y:
                             band_points.append((x, y))
                         else:
                             # For points below, use the band_y level
                             band_points.append((x, band_y))
-
+                    
                     # Complete the polygon
                     if band_points:
                         # Add right edge
                         band_points.append((width-1, band_y))
                         # Add left edge
                         band_points.insert(0, (0, band_y))
-
+                        
                         # Draw this band with its calculated opacity
-                        band_color = (*color, alpha)
+                        band_color = (r, g, b, alpha)
                         draw.polygon(band_points, fill=band_color)
-
+                
                 # Draw the actual graph line on top at 100% opacity
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=color, width=2)
@@ -500,12 +532,12 @@ class StockPlugin(DisplayPlugin):
                 # Use TextRenderer for better text rendering
                 if self.text_renderer:
                     self.text_renderer.draw_text(current_symbol, x=2, y=10, color=(255, 255, 255))
-
+                    
                     stock_data = self.stock_data.get(current_symbol, {})
                     if 'current' in stock_data:
                         price_text = f"${stock_data['current']:.2f}"
                         color = (0, 255, 0) if stock_data.get('change', 0) >= 0 else (255, 0, 0)
-                        self.text_renderer.draw_text(price_text, x=width-len(price_text)*7, y=10, color=color)
+                        self.text_renderer.draw_text(price_text, x=self.matrix.width-len(price_text)*7, y=10, color=color)
                 else:
                     # Fallback to direct canvas drawing if TextRenderer not available
                     graphics.DrawText(canvas, self.font, 2, 10, 
@@ -542,7 +574,7 @@ class StockPlugin(DisplayPlugin):
             if self.text_renderer:
                 self.text_renderer.draw_text("Stock API", x=2, y=12, color=(255, 0, 0))
                 self.text_renderer.draw_text("Error", x=2, y=25, color=(255, 0, 0))
-
+                
                 # Display the specific error for debugging
                 first_error = next((self.stock_error[symbol] for symbol in valid_symbols if symbol in self.stock_error), "Unknown")
                 if len(first_error) > 20:

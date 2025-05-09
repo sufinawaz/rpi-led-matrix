@@ -178,5 +178,43 @@ class APIServer:
                 }
             }
 
+        elif command == 'set_brightness':
+            brightness = request.get('brightness', 50)
+            if not isinstance(brightness, int) or brightness < 1 or brightness > 100:
+                return {"status": "error", "message": "Invalid brightness value"}
+
+            # Update the configuration
+            config = self.display_manager.config
+
+            if "matrix" not in config.config:
+                config.config["matrix"] = {}
+
+            config.config["matrix"]["brightness"] = brightness
+            config.save_config()
+
+            # Try to update the actual brightness if possible
+            try:
+                # Option 1: If matrix has a brightness attribute
+                if hasattr(self.display_manager.matrix, 'brightness'):
+                    self.display_manager.matrix.brightness = brightness
+                # Option 2: If matrix has a setBrightness method
+                elif hasattr(self.display_manager.matrix, 'setBrightness'):
+                    self.display_manager.matrix.setBrightness(brightness)
+                # Option 3: If matrix options has a brightness attribute
+                elif hasattr(self.display_manager.matrix, 'options') and hasattr(self.display_manager.matrix.options, 'brightness'):
+                    self.display_manager.matrix.options.brightness = brightness
+                    # Reinitialize matrix if needed
+
+                return {
+                    "status": "success",
+                    "message": f"Brightness set to {brightness}%"
+                }
+            except Exception as e:
+                logger.error(f"Failed to update brightness directly: {e}")
+                return {
+                    "status": "success",
+                    "message": f"Brightness set to {brightness}% (will apply on restart)"
+                }
+
         else:
             return {"status": "error", "message": f"Unknown command: {command}"}

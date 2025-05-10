@@ -548,14 +548,17 @@ def update_api_key():
 
 @app.route('/update_brightness', methods=['POST'])
 def update_brightness():
-    """Update the LED matrix brightness using config.ini"""
+    """Update the LED matrix brightness in real-time"""
     try:
         brightness = int(request.form.get('brightness', 50))
 
         # Ensure brightness is within valid range
         brightness = max(1, min(100, brightness))
 
-        # Update brightness in config.ini file
+        # Store whether we succeeded with direct update
+        direct_update_success = False
+
+        # Step 1: Update brightness in config.ini file for persistence
         import configparser
 
         # Path to the config.ini file in the project root
@@ -579,10 +582,33 @@ def update_brightness():
 
         logger.info(f"Updated brightness to {brightness}% in config.ini")
 
-        # Restart the service to apply changes
+        # Step 2: Try to update brightness directly using API client
+        try:
+            response = api_client.set_brightness(brightness)
+            if response and isinstance(response, dict):
+                # Check if update was applied immediately
+                if response.get('applied') == 'immediate':
+                    direct_update_success = True
+                    logger.info("Brightness updated immediately via API")
+                else:
+                    logger.info("API reports brightness will apply on restart")
+            elif response:
+                # Boolean response (legacy)
+                direct_update_success = True
+                logger.info("Brightness updated via API (legacy response)")
+        except Exception as e:
+            logger.info(f"Could not update brightness via API: {e}")
+
+        # Step 3: If API direct update succeeded, we're done!
+        if direct_update_success:
+            flash(f"Brightness updated to {brightness}%", "success")
+            return redirect(url_for('index'))
+
+        # Step 4: If direct update failed, try restart as last resort
+        logger.info("Direct brightness update not available, restarting service")
         subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
 
-        flash(f"Brightness updated to {brightness}%", "success")
+        flash(f"Brightness updated to {brightness}% (required restart)", "success")
         return redirect(url_for('index'))
     except Exception as e:
         logger.error(f"Error updating brightness: {e}")

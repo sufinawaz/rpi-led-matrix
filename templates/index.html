@@ -707,6 +707,139 @@
             border-top: 1px solid var(--border-color);
         }
 
+        /* Main tabs container */
+        .main-tabs-card {
+            margin-bottom: 24px;
+        }
+
+        .main-tabs {
+            display: flex;
+            border-bottom: none;
+            margin-bottom: 0;
+            width: 100%;
+        }
+
+        .main-tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            position: relative;
+            white-space: nowrap;
+            flex: 1;
+            text-align: center;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--card-radius) var(--card-radius) 0 0;
+            margin-right: 5px;
+            transition: var(--transition);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .main-tab:last-child {
+            margin-right: 0;
+        }
+
+        .main-tab.active {
+            color: var(--primary);
+            background-color: var(--bg-secondary);
+            border-bottom: none;
+        }
+
+        .main-tab:hover:not(.active) {
+            background-color: var(--border-color);
+        }
+
+        .main-tab-content {
+            display: none;
+            animation: fadeIn var(--animation-speed) ease;
+        }
+
+        .main-tab-content.active {
+            display: block;
+        }
+
+        /* GIF tabs styling */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            position: relative;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab.active {
+            color: var(--primary);
+        }
+
+        .tab.active:after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn var(--animation-speed) ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Responsive styling for tabs */
+        @media (max-width: 768px) {
+            .main-tab {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+
+            .main-tab i {
+                margin-right: 5px;
+            }
+
+            .tab {
+                padding: 10px 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-tab {
+                padding: 8px 5px;
+                font-size: 0.8rem;
+            }
+
+            .main-tab i {
+                margin-right: 3px;
+            }
+        }
+
         @keyframes slideIn {
             from {
                 transform: translateX(100%);
@@ -830,203 +963,205 @@
             </div>
         </div>
 
-        <!-- Display Plugins Card -->
-        <div class="card">
+        <!-- Main tabs section to replace the separate cards for plugins, GIFs, and settings -->
+        <div class="card main-tabs-card">
             <div class="card-header">
-                <h2><i class="fas fa-plug"></i> Display Plugins</h2>
-            </div>
-            <div class="card-body">
-                <div class="plugins-grid">
-                    {% for plugin in plugins %}
-                    <div class="plugin-card {% if plugin.active %}active{% endif %}">
-                        <div class="plugin-header">
-                            <div class="plugin-icon">
-                                {% if plugin.name == 'clock' %}
-                                <i class="fas fa-clock"></i>
-                                {% elif plugin.name == 'prayer' %}
-                                <i class="fas fa-pray"></i>
-                                {% elif plugin.name == 'gif' %}
-                                <i class="fas fa-film"></i>
-                                {% elif plugin.name == 'intro' %}
-                                <i class="fas fa-image"></i>
-                                {% elif plugin.name == 'moon' %}
-                                <i class="fas fa-moon"></i>
-                                {% elif plugin.name == 'weather' %}
-                                <i class="fas fa-cloud-sun"></i>
-                                {% elif plugin.name == 'stock' %}
-                                <i class="fas fa-chart-line"></i>
-                                {% elif plugin.name == 'wmata' %}
-                                <i class="fas fa-subway"></i>
-                                {% else %}
-                                <i class="fas fa-puzzle-piece"></i>
-                                {% endif %}
-                            </div>
-                            <h3 class="plugin-name">{{ plugin.name|capitalize }}</h3>
-                        </div>
-                        <div class="plugin-description">{{ plugin.description }}</div>
-                        <div class="plugin-actions">
-                            <a href="{{ url_for('set_mode', mode=plugin.name) }}"
-                                class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not
-                                is_running %}disabled{% endif %}>
-                                <i class="fas fa-play"></i> Activate
-                            </a>
-                            <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}"
-                                class="btn btn-secondary btn-sm">
-                                <i class="fas fa-cog"></i> Configure
-                            </a>
-                        </div>
+                <div class="main-tabs">
+                    <div class="tab main-tab" data-main-tab="plugins" id="plugins-tab">
+                        <i class="fas fa-puzzle-piece"></i> Display Plugins
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <!-- GIFs Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-images"></i> GIFs</h2>
-                <div
-                    class="status-indicator {% if current_mode == 'gif' %}status-active{% else %}status-inactive{% endif %}">
-                    <span class="status-dot"></span>
-                    {% if current_mode == 'gif' %}Active{% else %}Inactive{% endif %}
+                    <div class="tab main-tab" data-main-tab="gifs" id="gifs-tab">
+                        <i class="fas fa-film"></i> Animations
+                    </div>
+                    <div class="tab main-tab" data-main-tab="settings" id="settings-tab">
+                        <i class="fas fa-cog"></i> Settings
+                    </div>
                 </div>
             </div>
             <div class="card-body">
-                <div class="tabs">
-                    <div class="tab active" data-tab="existing-gifs">
-                        <i class="fas fa-images"></i> Gallery
-                    </div>
-                    <div class="tab" data-tab="add-gif-url">
-                        <i class="fas fa-link"></i> Add from URL
-                    </div>
-                    <div class="tab" data-tab="upload-gif">
-                        <i class="fas fa-upload"></i> Upload
-                    </div>
-                </div>
-
-                <!-- Existing GIFs Tab -->
-                <div class="tab-content active" id="existing-gifs">
-                    {% if available_gifs %}
-                    <div class="gif-grid">
-                        {% for gif in available_gifs %}
-                        <div class="gif-item {% if current_mode == 'gif' and current_gif == gif %}active{% endif %}">
-                            <div class="gif-placeholder">
-                                <i class="fas fa-play-circle"></i>
-                            </div>
-                            <div class="gif-details">
-                                <div class="gif-name" title="{{ gif }}">{{ gif }}</div>
-                                <div class="gif-actions">
-                                    <form action="{{ url_for('set_gif') }}" method="post" style="flex: 1;">
-                                        <input type="hidden" name="gif_name" value="{{ gif }}">
-                                        <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if not
-                                            is_running %}disabled{% endif %}>
-                                            <i class="fas fa-play"></i>
-                                        </button>
-                                    </form>
-                                    <a href="{{ url_for('delete_gif', gif_name=gif) }}"
-                                        class="btn btn-danger btn-sm gif-action-btn"
-                                        onclick="return confirm('Delete this GIF?');">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
+                <!-- Plugins Tab Content -->
+                <div class="main-tab-content" id="plugins-content">
+                    <div class="plugins-grid">
+                        {% for plugin in plugins %}
+                        <div class="plugin-card {% if plugin.active %}active{% endif %}">
+                            <div class="plugin-header">
+                                <div class="plugin-icon">
+                                    {% if plugin.name == 'clock' %}
+                                    <i class="fas fa-clock"></i>
+                                    {% elif plugin.name == 'prayer' %}
+                                    <i class="fas fa-pray"></i>
+                                    {% elif plugin.name == 'gif' %}
+                                    <i class="fas fa-film"></i>
+                                    {% elif plugin.name == 'intro' %}
+                                    <i class="fas fa-image"></i>
+                                    {% elif plugin.name == 'moon' %}
+                                    <i class="fas fa-moon"></i>
+                                    {% elif plugin.name == 'weather' %}
+                                    <i class="fas fa-cloud-sun"></i>
+                                    {% elif plugin.name == 'stock' %}
+                                    <i class="fas fa-chart-line"></i>
+                                    {% elif plugin.name == 'wmata' %}
+                                    <i class="fas fa-subway"></i>
+                                    {% else %}
+                                    <i class="fas fa-puzzle-piece"></i>
+                                    {% endif %}
                                 </div>
+                                <h3 class="plugin-name">{{ plugin.name|capitalize }}</h3>
+                            </div>
+                            <div class="plugin-description">{{ plugin.description }}</div>
+                            <div class="plugin-actions">
+                                <a href="{{ url_for('set_mode', mode=plugin.name) }}"
+                                    class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not
+                                    is_running %}disabled{% endif %}>
+                                    <i class="fas fa-play"></i> Activate
+                                </a>
+                                <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}"
+                                    class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-cog"></i> Configure
+                                </a>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
-                    {% else %}
-                    <div style="text-align: center; padding: 40px 20px;">
-                        <i class="fas fa-film"
-                            style="font-size: 3rem; color: var(--text-muted); margin-bottom: 15px;"></i>
-                        <p>No GIFs available. Add some using the tabs above!</p>
+                </div>
+
+                <!-- GIFs Tab Content -->
+                <div class="main-tab-content" id="gifs-content">
+                    <div class="tabs">
+                        <div class="tab gif-tab active" data-tab="existing-gifs">
+                            <i class="fas fa-images"></i> Gallery
+                        </div>
+                        <div class="tab gif-tab" data-tab="add-gif-url">
+                            <i class="fas fa-link"></i> Add from URL
+                        </div>
+                        <div class="tab gif-tab" data-tab="upload-gif">
+                            <i class="fas fa-upload"></i> Upload
+                        </div>
                     </div>
-                    {% endif %}
-                </div>
 
-                <!-- Add GIF from URL Tab -->
-                <div class="tab-content" id="add-gif-url">
-                    <form action="{{ url_for('add_gif') }}" method="post">
-                        <div class="form-group">
-                            <label for="gif_url">GIF URL</label>
-                            <input type="url" id="gif_url" name="gif_url" class="form-control"
-                                placeholder="https://example.com/animation.gif" required>
+                    <!-- Existing GIFs Tab -->
+                    <div class="tab-content active" id="existing-gifs">
+                        {% if available_gifs %}
+                        <div class="gif-grid">
+                            {% for gif in available_gifs %}
+                            <div
+                                class="gif-item {% if current_mode == 'gif' and current_gif == gif %}active{% endif %}">
+                                <div class="gif-placeholder">
+                                    <i class="fas fa-play-circle"></i>
+                                </div>
+                                <div class="gif-details">
+                                    <div class="gif-name" title="{{ gif }}">{{ gif }}</div>
+                                    <div class="gif-actions">
+                                        <form action="{{ url_for('set_gif') }}" method="post" style="flex: 1;">
+                                            <input type="hidden" name="gif_name" value="{{ gif }}">
+                                            <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if
+                                                not is_running %}disabled{% endif %}>
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('delete_gif', gif_name=gif) }}"
+                                            class="btn btn-danger btn-sm gif-action-btn"
+                                            onclick="return confirm('Delete this GIF?');">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
-                        <div class="form-group">
-                            <label for="gif_name">Custom Name (optional)</label>
-                            <input type="text" id="gif_name" name="gif_name" class="form-control"
-                                placeholder="my_cool_animation">
+                        {% else %}
+                        <div style="text-align: center; padding: 40px 20px;">
+                            <i class="fas fa-film"
+                                style="font-size: 3rem; color: var(--text-muted); margin-bottom: 15px;"></i>
+                            <p>No GIFs available. Add some using the tabs above!</p>
                         </div>
-                        <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
-                            <i class="fas fa-plus"></i> Add GIF
-                        </button>
-                    </form>
-                </div>
+                        {% endif %}
+                    </div>
 
-                <!-- Upload GIF Tab -->
-                <div class="tab-content" id="upload-gif">
-                    <form action="{{ url_for('upload_gif') }}" method="post" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label for="gif_file">Select GIF File</label>
-                            <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif"
-                                required>
-                        </div>
-                        <div class="form-group">
-                            <label for="gif_upload_name">Custom Name (optional)</label>
-                            <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control"
-                                placeholder="my_cool_animation">
-                        </div>
-                        <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
-                            <i class="fas fa-upload"></i> Upload GIF
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-cog"></i> Settings</h2>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('update_api_key') }}" method="post">
-                    <div class="form-group">
-                        <label for="weather_api_key">OpenWeatherMap API Key</label>
-                        <div class="password-field">
-                            <input type="password" id="weather_api_key" name="weather_api_key" class="form-control"
-                                placeholder="Enter your API key" value="{{ masked_api_key }}">
-                            <button type="button" id="toggle-api-key" class="password-toggle">
-                                <i class="fas fa-eye"></i>
+                    <!-- Add GIF from URL Tab -->
+                    <div class="tab-content" id="add-gif-url">
+                        <form action="{{ url_for('add_gif') }}" method="post">
+                            <div class="form-group">
+                                <label for="gif_url">GIF URL</label>
+                                <input type="url" id="gif_url" name="gif_url" class="form-control"
+                                    placeholder="https://example.com/animation.gif" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="gif_name">Custom Name (optional)</label>
+                                <input type="text" id="gif_name" name="gif_name" class="form-control"
+                                    placeholder="my_cool_animation">
+                            </div>
+                            <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
+                                <i class="fas fa-plus"></i> Add GIF
                             </button>
-                        </div>
-                        <div class="form-info">
-                            Get your API key at <a href="https://openweathermap.org/api"
-                                target="_blank">OpenWeatherMap</a>
-                        </div>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Save Settings
-                    </button>
-                </form>
-                <hr class="settings-divider">
 
-                <form action="{{ url_for('update_brightness') }}" method="post">
-                    <div class="form-group">
-                        <label for="brightness">LED Matrix Brightness</label>
-                        <div class="brightness-control">
-                            <i class="fas fa-sun" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
-                            <input type="range" id="brightness" name="brightness" min="1" max="100"
-                                value="{{ config.get('matrix', {}).get('brightness', 50) }}" class="brightness-slider">
-                            <span class="brightness-value">{{ config.get('matrix', {}).get('brightness', 50) }}%</span>
-                            <i class="fas fa-sun" style="color: var(--text-primary); font-size: 1.2rem;"></i>
-                        </div>
-                        <div class="form-info">
-                            Adjust the brightness level of the LED matrix display (1-100%)
-                        </div>
+                    <!-- Upload GIF Tab -->
+                    <div class="tab-content" id="upload-gif">
+                        <form action="{{ url_for('upload_gif') }}" method="post" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="gif_file">Select GIF File</label>
+                                <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label for="gif_upload_name">Custom Name (optional)</label>
+                                <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control"
+                                    placeholder="my_cool_animation">
+                            </div>
+                            <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
+                                <i class="fas fa-upload"></i> Upload GIF
+                            </button>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-sun"></i> Update Brightness
-                    </button>
-                </form>
+                </div>
+
+                <!-- Settings Tab Content -->
+                <div class="main-tab-content" id="settings-content">
+                    <form action="{{ url_for('update_api_key') }}" method="post">
+                        <div class="form-group">
+                            <label for="weather_api_key">OpenWeatherMap API Key</label>
+                            <div class="password-field">
+                                <input type="password" id="weather_api_key" name="weather_api_key" class="form-control"
+                                    placeholder="Enter your API key" value="{{ masked_api_key }}">
+                                <button type="button" id="toggle-api-key" class="password-toggle">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-info">
+                                Get your API key at <a href="https://openweathermap.org/api"
+                                    target="_blank">OpenWeatherMap</a>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save API Key
+                        </button>
+                    </form>
+
+                    <hr class="settings-divider">
+
+                    <form action="{{ url_for('update_brightness') }}" method="post">
+                        <div class="form-group">
+                            <label for="brightness">LED Matrix Brightness</label>
+                            <div class="brightness-control">
+                                <i class="fas fa-sun" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
+                                <input type="range" id="brightness" name="brightness" min="1" max="100"
+                                    value="{{ config.get('matrix', {}).get('brightness', 50) }}"
+                                    class="brightness-slider">
+                                <span class="brightness-value">{{ config.get('matrix', {}).get('brightness', 50)
+                                    }}%</span>
+                                <i class="fas fa-sun" style="color: var(--text-primary); font-size: 1.2rem;"></i>
+                            </div>
+                            <div class="form-info">
+                                Adjust the brightness level of the LED matrix display (1-100%)
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sun"></i> Update Brightness
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -1042,62 +1177,69 @@
 
     <script>
         // Theme toggle functionality
+        // Tabbed interface with persistent tabs functionality
         document.addEventListener('DOMContentLoaded', function () {
-            const themeToggle = document.getElementById('theme-toggle');
+            // Handle main tabs
+            const mainTabs = document.querySelectorAll('.main-tab');
+            const mainTabContents = document.querySelectorAll('.main-tab-content');
 
-            // Check for saved theme preference or use device preference
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                themeToggle.checked = true;
-            }
+            // Check localStorage for last selected tab
+            const lastMainTab = localStorage.getItem('lastMainTab') || 'plugins';
 
-            // Theme toggle event listener
-            themeToggle.addEventListener('change', function () {
-                if (this.checked) {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.documentElement.removeAttribute('data-theme');
-                    localStorage.setItem('theme', 'light');
-                }
-            });
+            // Set initial active tab based on localStorage
+            activateMainTab(lastMainTab);
 
-            // Tab functionality
-            document.querySelectorAll('.tab').forEach(tab => {
+            // Add click event listeners to main tabs
+            mainTabs.forEach(tab => {
                 tab.addEventListener('click', () => {
-                    // Remove active class from all tabs
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    const tabId = tab.getAttribute('data-main-tab');
+                    activateMainTab(tabId);
 
-                    // Add active class to clicked tab
-                    tab.classList.add('active');
-
-                    // Hide all tab contents
-                    document.querySelectorAll('.tab-content').forEach(content => {
-                        content.classList.remove('active');
-                    });
-
-                    // Show content for active tab
-                    const tabId = tab.getAttribute('data-tab');
-                    document.getElementById(tabId).classList.add('active');
+                    // Save to localStorage
+                    localStorage.setItem('lastMainTab', tabId);
                 });
             });
 
-            // Toggle API key visibility
-            document.getElementById('toggle-api-key').addEventListener('click', function () {
-                const apiKeyInput = document.getElementById('weather_api_key');
-                const toggleIcon = this.querySelector('i');
+            function activateMainTab(tabId) {
+                // Remove active class from all tabs and contents
+                mainTabs.forEach(t => t.classList.remove('active'));
+                mainTabContents.forEach(c => c.classList.remove('active'));
 
-                if (apiKeyInput.type === 'password') {
-                    apiKeyInput.type = 'text';
-                    toggleIcon.classList.remove('fa-eye');
-                    toggleIcon.classList.add('fa-eye-slash');
-                } else {
-                    apiKeyInput.type = 'password';
-                    toggleIcon.classList.remove('fa-eye-slash');
-                    toggleIcon.classList.add('fa-eye');
-                }
+                // Add active class to selected tab and content
+                document.querySelector(`[data-main-tab="${tabId}"]`).classList.add('active');
+                document.getElementById(`${tabId}-content`).classList.add('active');
+            }
+
+            // Handle GIF tabs
+            const gifTabs = document.querySelectorAll('.gif-tab');
+            const gifTabContents = document.querySelectorAll('.tab-content');
+
+            // Check localStorage for last selected GIF tab
+            const lastGifTab = localStorage.getItem('lastGifTab') || 'existing-gifs';
+
+            // Set initial active GIF tab based on localStorage
+            activateGifTab(lastGifTab);
+
+            // Add click event listeners to GIF tabs
+            gifTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    activateGifTab(tabId);
+
+                    // Save to localStorage
+                    localStorage.setItem('lastGifTab', tabId);
+                });
             });
+
+            function activateGifTab(tabId) {
+                // Remove active class from all tabs and contents
+                gifTabs.forEach(t => t.classList.remove('active'));
+                gifTabContents.forEach(c => c.classList.remove('active'));
+
+                // Add active class to selected tab and content
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            }
 
             // Live update for brightness slider
             const brightnessSlider = document.getElementById('brightness');
@@ -1105,6 +1247,25 @@
             if (brightnessSlider && brightnessValue) {
                 brightnessSlider.addEventListener('input', function () {
                     brightnessValue.textContent = this.value + '%';
+                });
+            }
+
+            // Toggle API key visibility
+            const toggleApiKey = document.getElementById('toggle-api-key');
+            const apiKeyInput = document.getElementById('weather_api_key');
+            if (toggleApiKey && apiKeyInput) {
+                toggleApiKey.addEventListener('click', function () {
+                    const toggleIcon = this.querySelector('i');
+
+                    if (apiKeyInput.type === 'password') {
+                        apiKeyInput.type = 'text';
+                        toggleIcon.classList.remove('fa-eye');
+                        toggleIcon.classList.add('fa-eye-slash');
+                    } else {
+                        apiKeyInput.type = 'password';
+                        toggleIcon.classList.remove('fa-eye-slash');
+                        toggleIcon.classList.add('fa-eye');
+                    }
                 });
             }
 

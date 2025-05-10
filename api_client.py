@@ -151,3 +151,30 @@ class APIClient:
             error_msg = response.get('message', 'Unknown error') if response else 'No response'
             logger.error(f"Failed to set brightness: {error_msg}")
             return False
+
+    def set_plugin_cycle(self, enabled, plugins, duration):
+        """Set plugin cycling configuration
+
+        Args:
+            enabled: Boolean to enable/disable cycling
+            plugins: List of plugin names to cycle through
+            duration: Number of seconds to display each plugin
+
+        Returns:
+            True if successful, False otherwise
+        """
+        request = {
+            'command': 'set_plugin_cycle',
+            'enabled': enabled,
+            'plugins': plugins,
+            'duration': duration
+        }
+
+        response = self._send_request(request)
+        if response and response.get('status') == 'success':
+            logger.info(f"Successfully updated plugin cycling settings")
+            return True
+        else:
+            error_msg = response.get('message', 'Unknown error') if response else 'No response'
+            logger.error(f"Failed to update plugin cycling: {error_msg}")
+            return False

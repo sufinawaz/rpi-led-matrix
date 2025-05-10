@@ -384,6 +384,10 @@ def index():
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
+    plugin_cycle_config = load_config().get("plugin_cycle", {})
+    if plugin_cycle_config:
+        config["plugin_cycle"] = plugin_cycle_config
+
 
     # Get brightness from config.ini
     import configparser
@@ -967,6 +971,57 @@ def api_list_gifs():
     """API endpoint to list available GIFs"""
     gifs = scan_gifs()
     return jsonify(gifs)
+
+@app.route('/update_plugin_cycle', methods=['POST'])
+def update_plugin_cycle():
+    """Update plugin cycling settings"""
+    try:
+        # Get form data
+        cycle_enabled = 'cycle_enabled' in request.form
+        cycle_plugins = request.form.getlist('cycle_plugins')
+        display_duration = int(request.form.get('display_duration', 30))
+
+        # Validate display duration
+        display_duration = max(10, min(3600, display_duration))
+
+        # Ensure at least one plugin is selected when enabled
+        if cycle_enabled and not cycle_plugins:
+            flash("Please select at least one plugin for cycling", "error")
+            return redirect(url_for('index'))
+
+        # Update config structure
+        config = load_config()
+        if "plugin_cycle" not in config:
+            config["plugin_cycle"] = {}
+
+        config["plugin_cycle"]["enabled"] = cycle_enabled
+        config["plugin_cycle"]["plugins"] = cycle_plugins
+        config["plugin_cycle"]["duration"] = display_duration
+        config["plugin_cycle"]["last_switch"] = int(time.time())  # Current time
+
+        # Save the updated config
+        save_config(config)
+
+        # If cycling is enabled, update our API service and restart
+        if cycle_enabled:
+            # Use API client if available
+            try:
+                api_client.set_plugin_cycle(cycle_enabled, cycle_plugins, display_duration)
+            except Exception as e:
+                logger.error(f"API client error: {e}")
+                # Fall back to restart method
+                subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+        else:
+            # If disabling, we need to restart the service
+            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+        flash("Plugin cycling settings updated successfully", "success")
+
+    except Exception as e:
+        logger.error(f"Error updating plugin cycling settings: {e}")
+        flash(f"Error updating plugin cycling settings: {e}", "error")
+
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     # Start the web server

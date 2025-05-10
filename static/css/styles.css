@@ -750,6 +750,104 @@ label {
   margin-bottom: 15px;
 }
 
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  width: 60px;
+  height: 30px;
+  display: inline-block;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 30px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: '';
+  height: 22px;
+  width: 22px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: var(--primary);
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px var(--primary);
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(30px);
+}
+
+/* Plugin Cycling Styles */
+.cycle-plugins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cycle-plugin-item {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.cycle-plugin-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cycle-plugin-item input[type='checkbox'] {
+  margin-right: 8px;
+}
+
+.cycle-plugin-item label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.cycle-plugin-item i {
+  margin-right: 5px;
+  color: var(--primary);
+}
+
+/* Add this to your existing settings-divider style if you haven't already */
+.settings-divider {
+  border: 0;
+  height: 1px;
+  background-color: var(--card-border);
+  margin: 20px 0;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {

@@ -60,6 +60,17 @@
                         <span class="status-value">{{ current_mode|capitalize }}</span>
                     </div>
 
+                    <!-- Add this cycling status indicator -->
+                    {% if config.get('plugin_cycle', {}).get('enabled', False) %}
+                    <div class="status-item">
+                        <span class="status-label">Plugin Cycling</span>
+                        <span class="status-value cycling-active">
+                            <i class="fas fa-sync fa-spin"></i> Active
+                            <small>({{ config.get('plugin_cycle', {}).get('duration', 30) }}s)</small>
+                        </span>
+                    </div>
+                    {% endif %}
+
                     {% if current_mode == "gif" %}
                     <div class="status-item">
                         <span class="status-label">Current GIF</span>
@@ -70,16 +81,13 @@
 
                 <!-- Power control buttons -->
                 <div class="button-group">
-                    <a href="{{ url_for('start_service_route') }}" class="btn btn-success" {% if is_running %}disabled{%
-                        endif %}>
+                    <a href="{{ url_for('start_service_route') }}" class="btn btn-success" {% if is_running %}disabled{% endif %}>
                         <i class="fas fa-play"></i> Start
                     </a>
-                    <a href="{{ url_for('restart_service') }}" class="btn btn-warning" {% if not is_running %}disabled{%
-                        endif %}>
+                    <a href="{{ url_for('restart_service') }}" class="btn btn-warning" {% if not is_running %}disabled{% endif %}>
                         <i class="fas fa-redo"></i> Restart
                     </a>
-                    <a href="{{ url_for('stop_service_route') }}" class="btn btn-danger" {% if not is_running
-                        %}disabled{% endif %}>
+                    <a href="{{ url_for('stop_service_route') }}" class="btn btn-danger" {% if not is_running %}disabled{% endif %}>
                         <i class="fas fa-stop"></i> Stop
                     </a>
                 </div>
@@ -133,13 +141,10 @@
                             </div>
                             <div class="plugin-description">{{ plugin.description }}</div>
                             <div class="plugin-actions">
-                                <a href="{{ url_for('set_mode', mode=plugin.name) }}"
-                                    class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not
-                                    is_running %}disabled{% endif %}>
+                                <a href="{{ url_for('set_mode', mode=plugin.name) }}" class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not is_running %}disabled{% endif %}>
                                     <i class="fas fa-play"></i> Activate
                                 </a>
-                                <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}"
-                                    class="btn btn-secondary btn-sm">
+                                <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-cog"></i> Configure
                                 </a>
                             </div>
@@ -167,8 +172,7 @@
                         {% if available_gifs %}
                         <div class="gif-grid">
                             {% for gif in available_gifs %}
-                            <div
-                                class="gif-item {% if current_mode == 'gif' and current_gif == gif %}active{% endif %}">
+                            <div class="gif-item {% if current_mode == 'gif' and current_gif == gif %}active{% endif %}">
                                 <div class="gif-placeholder">
                                     <i class="fas fa-play-circle"></i>
                                 </div>
@@ -177,14 +181,12 @@
                                     <div class="gif-actions">
                                         <form action="{{ url_for('set_gif') }}" method="post" style="flex: 1;">
                                             <input type="hidden" name="gif_name" value="{{ gif }}">
-                                            <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if
-                                                not is_running %}disabled{% endif %}>
+                                            <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if not is_running %}disabled{% endif %}>
                                                 <i class="fas fa-play"></i>
                                             </button>
                                         </form>
-                                        <a href="{{ url_for('delete_gif', gif_name=gif) }}"
-                                            class="btn btn-danger btn-sm gif-action-btn"
-                                            onclick="return confirm('Delete this GIF?');">
+                                        <a href="{{ url_for('delete_gif', gif_name=gif) }}" class="btn btn-danger btn-sm gif-action-btn" 
+                                           onclick="return confirm('Delete this GIF?');">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -205,13 +207,13 @@
                         <form action="{{ url_for('add_gif') }}" method="post">
                             <div class="form-group">
                                 <label for="gif_url">GIF URL</label>
-                                <input type="url" id="gif_url" name="gif_url" class="form-control"
-                                    placeholder="https://example.com/animation.gif" required>
+                                <input type="url" id="gif_url" name="gif_url" class="form-control" 
+                                       placeholder="https://example.com/animation.gif" required>
                             </div>
                             <div class="form-group">
                                 <label for="gif_name">Custom Name (optional)</label>
-                                <input type="text" id="gif_name" name="gif_name" class="form-control"
-                                    placeholder="my_cool_animation">
+                                <input type="text" id="gif_name" name="gif_name" class="form-control" 
+                                       placeholder="my_cool_animation">
                             </div>
                             <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
                                 <i class="fas fa-plus"></i> Add GIF
@@ -224,13 +226,12 @@
                         <form action="{{ url_for('upload_gif') }}" method="post" enctype="multipart/form-data">
                             <div class="form-group">
                                 <label for="gif_file">Select GIF File</label>
-                                <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif"
-                                    required>
+                                <input type="file" id="gif_file" name="gif_file" class="form-control" accept=".gif" required>
                             </div>
                             <div class="form-group">
                                 <label for="gif_upload_name">Custom Name (optional)</label>
-                                <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control"
-                                    placeholder="my_cool_animation">
+                                <input type="text" id="gif_upload_name" name="gif_upload_name" class="form-control" 
+                                       placeholder="my_cool_animation">
                             </div>
                             <button type="submit" class="btn btn-primary" {% if not is_running %}disabled{% endif %}>
                                 <i class="fas fa-upload"></i> Upload GIF
@@ -245,15 +246,14 @@
                         <div class="form-group">
                             <label for="weather_api_key">OpenWeatherMap API Key</label>
                             <div class="password-field">
-                                <input type="password" id="weather_api_key" name="weather_api_key" class="form-control"
-                                    placeholder="Enter your API key" value="{{ masked_api_key }}">
+                                <input type="password" id="weather_api_key" name="weather_api_key" class="form-control" 
+                                       placeholder="Enter your API key" value="{{ masked_api_key }}">
                                 <button type="button" id="toggle-api-key" class="password-toggle">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
                             <div class="form-info">
-                                Get your API key at <a href="https://openweathermap.org/api"
-                                    target="_blank">OpenWeatherMap</a>
+                                Get your API key at <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary">
@@ -268,11 +268,9 @@
                             <label for="brightness">LED Matrix Brightness</label>
                             <div class="brightness-control">
                                 <i class="fas fa-sun" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
-                                <input type="range" id="brightness" name="brightness" min="1" max="100"
-                                    value="{{ config.get('matrix', {}).get('brightness', 50) }}"
-                                    class="brightness-slider">
-                                <span class="brightness-value">{{ config.get('matrix', {}).get('brightness', 50)
-                                    }}%</span>
+                                <input type="range" id="brightness" name="brightness" min="1" max="100" 
+                                       value="{{ config.get('matrix', {}).get('brightness', 50) }}" class="brightness-slider">
+                                <span class="brightness-value">{{ config.get('matrix', {}).get('brightness', 50) }}%</span>
                                 <i class="fas fa-sun" style="color: var(--text-primary); font-size: 1.2rem;"></i>
                             </div>
                             <div class="form-info">
@@ -283,6 +281,7 @@
                             <i class="fas fa-sun"></i> Update Brightness
                         </button>
                     </form>
+
                     <hr class="settings-divider">
 
                     <form action="{{ url_for('update_plugin_cycle') }}" method="post">
@@ -292,33 +291,33 @@
                         <div class="form-group">
                             <label for="cycle_enabled">Enable Plugin Cycling</label>
                             <div class="toggle-switch">
-                                <input type="checkbox" id="cycle_enabled" name="cycle_enabled" value="true" {% if
-                                    config.get('plugin_cycle', {}).get('enabled', False) %}checked{% endif %}>
+                                <input type="checkbox" id="cycle_enabled" name="cycle_enabled" value="true"
+                                       {% if config.get('plugin_cycle', {}).get('enabled', False) %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </div>
-                            <div class="form-info">When enabled, selected plugins will automatically rotate based on the
-                                specified duration.</div>
+                            <div class="form-info">When enabled, selected plugins will automatically rotate based on the specified duration.</div>
                         </div>
 
                         <div class="form-group">
                             <label>Select Plugins to Cycle</label>
-                            <div class="cycle-plugins-grid">
+                            <div class="cycle-plugins-grid {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}">
                                 {% for plugin in plugins %}
                                 <div class="cycle-plugin-item">
-                                    <input type="checkbox" id="cycle_plugin_{{ plugin.name }}" name="cycle_plugins"
-                                        value="{{ plugin.name }}" {% if plugin.name in config.get('plugin_cycle',
-                                        {}).get('plugins', []) %}checked{% endif %}>
+                                    <input type="checkbox" id="cycle_plugin_{{ plugin.name }}" name="cycle_plugins" 
+                                           value="{{ plugin.name }}" 
+                                           {% if plugin.name in config.get('plugin_cycle', {}).get('plugins', []) %}checked{% endif %}
+                                           {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}>
                                     <label for="cycle_plugin_{{ plugin.name }}">
                                         <i class="fas 
-                       {% if plugin.name == 'clock' %}fa-clock
-                       {% elif plugin.name == 'prayer' %}fa-pray
-                       {% elif plugin.name == 'gif' %}fa-film
-                       {% elif plugin.name == 'intro' %}fa-image
-                       {% elif plugin.name == 'moon' %}fa-moon
-                       {% elif plugin.name == 'weather' %}fa-cloud-sun
-                       {% elif plugin.name == 'stock' %}fa-chart-line
-                       {% elif plugin.name == 'wmata' %}fa-subway
-                       {% else %}fa-puzzle-piece{% endif %}"></i>
+                                           {% if plugin.name == 'clock' %}fa-clock
+                                           {% elif plugin.name == 'prayer' %}fa-pray
+                                           {% elif plugin.name == 'gif' %}fa-film
+                                           {% elif plugin.name == 'intro' %}fa-image
+                                           {% elif plugin.name == 'moon' %}fa-moon
+                                           {% elif plugin.name == 'weather' %}fa-cloud-sun
+                                           {% elif plugin.name == 'stock' %}fa-chart-line
+                                           {% elif plugin.name == 'wmata' %}fa-subway
+                                           {% else %}fa-puzzle-piece{% endif %}"></i>
                                         {{ plugin.name|capitalize }}
                                     </label>
                                 </div>
@@ -329,7 +328,8 @@
                         <div class="form-group">
                             <label for="display_duration">Display Duration (seconds)</label>
                             <input type="number" id="display_duration" name="display_duration" class="form-control"
-                                value="{{ config.get('plugin_cycle', {}).get('duration', 30) }}" min="10" max="3600">
+                                   value="{{ config.get('plugin_cycle', {}).get('duration', 30) }}" min="10" max="3600"
+                                   {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}>
                             <div class="form-info">
                                 How long each plugin should stay on screen before switching to the next one.
                             </div>

@@ -31,6 +31,19 @@ class DisplayManager:
         # Load plugins
         self.load_plugins()
 
+        self.plugin_cycling = False
+        self.cycle_plugins = []
+        self.cycle_duration = 30  # Default: 30 seconds
+        self.last_cycle_switch = time.time()
+
+        # Load plugin cycling settings from config
+        cycle_config = self.config.get("plugin_cycle", {})
+        if cycle_config:
+            self.plugin_cycling = cycle_config.get("enabled", False)
+            self.cycle_plugins = cycle_config.get("plugins", [])
+            self.cycle_duration = cycle_config.get("duration", 30)
+            self.last_cycle_switch = cycle_config.get("last_switch", time.time())
+
         # Initialize API server
         self.api_server = APIServer(self)
         self.api_server.start()
@@ -261,6 +274,34 @@ class DisplayManager:
                 delta_time = current_time - last_time
                 last_time = current_time
 
+                # Handle plugin cycling
+                if self.plugin_cycling and self.cycle_plugins:
+                    cycle_elapsed = current_time - self.last_cycle_switch
+                    if cycle_elapsed >= self.cycle_duration:
+                        # Time to switch to the next plugin
+                        if self.current_plugin:
+                            current_index = -1
+                            current_name = self.current_plugin.name
+
+                            try:
+                                current_index = self.cycle_plugins.index(current_name)
+                            except ValueError:
+                                # Current plugin not in cycle list, start with first
+                                current_index = -1
+
+                            # Move to the next plugin in the cycle
+                            next_index = (current_index + 1) % len(self.cycle_plugins)
+                            next_plugin = self.cycle_plugins[next_index]
+
+                            # Switch to the next plugin
+                            if next_plugin in self.plugins and next_plugin != current_name:
+                                logger.info(f"Cycling to plugin: {next_plugin}")
+                                self.set_plugin(next_plugin)
+
+                                # Update config with the last switch time
+                                self.last_cycle_switch = current_time
+                                self.config.set("plugin_cycle", "last_switch", int(self.last_cycle_switch))
+
                 # Update plugin state
                 self.current_plugin.update(delta_time)
 
@@ -297,4 +338,40 @@ class DisplayManager:
             first_plugin = next(iter(self.plugins.keys()))
             logger.warning(f"Default plugin '{default_plugin}' not available, using '{first_plugin}'")
             self.set_plugin(first_plugin)
+
+    def set_plugin_cycling(self, enabled, plugins, duration):
+        """Set plugin cycling configuration
+
+        Args:
+            enabled: Boolean to enable/disable cycling
+            plugins: List of plugin names to cycle through
+            duration: Number of seconds to display each plugin
+        """
+        self.plugin_cycling = enabled
+
+        # Filter plugins to ensure they all exist
+        self.cycle_plugins = [p for p in plugins if p in self.plugins]
+
+        # Ensure duration is valid
+        self.cycle_duration = max(10, min(3600, duration))
+
+        # Reset timer
+        self.last_cycle_switch = time.time()
+
+        # Update config
+        self.config.set("plugin_cycle", "enabled", enabled)
+        self.config.set("plugin_cycle", "plugins", self.cycle_plugins)
+        self.config.set("plugin_cycle", "duration", self.cycle_duration)
+        self.config.set("plugin_cycle", "last_switch", int(self.last_cycle_switch))
+
+        # If cycling is enabled and we have plugins, start with the first one
+        if enabled and self.cycle_plugins:
+            first_plugin = self.cycle_plugins[0]
+            if first_plugin in self.plugins:
+                self.set_plugin(first_plugin)
+
+        logger.info(f"Plugin cycling {'enabled' if enabled else 'disabled'}")
+        if enabled:
+            logger.info(f"Cycling through: {', '.join(self.cycle_plugins)} every {self.cycle_duration}s")
+
 

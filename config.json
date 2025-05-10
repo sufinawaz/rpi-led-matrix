@@ -84,5 +84,15 @@
         }
       }
     }
+  },
+  "current_state": {
+    "current_plugin": "clock",
+    "current_gif": ""
+  },
+  "plugin_cycle": {
+    "enabled": false,
+    "plugins": ["clock", "weather", "moon"],
+    "duration": 30,
+    "last_switch": 1714413245
   }
 }

@@ -60,6 +60,17 @@
                         <span class="status-value">{{ current_mode|capitalize }}</span>
                     </div>
 
+                    <!-- Add this cycling status indicator -->
+                    {% if config.get('plugin_cycle', {}).get('enabled', False) %}
+                    <div class="status-item">
+                        <span class="status-label">Plugin Cycling</span>
+                        <span class="status-value cycling-active">
+                            <i class="fas fa-sync fa-spin"></i> Active
+                            <small>({{ config.get('plugin_cycle', {}).get('duration', 30) }}s)</small>
+                        </span>
+                    </div>
+                    {% endif %}
+
                     {% if current_mode == "gif" %}
                     <div class="status-item">
                         <span class="status-label">Current GIF</span>
@@ -268,6 +279,64 @@
                         </div>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-sun"></i> Update Brightness
+                        </button>
+                    </form>
+
+                    <hr class="settings-divider">
+
+                    <form action="{{ url_for('update_plugin_cycle') }}" method="post">
+                        <h3><i class="fas fa-sync"></i> Plugin Cycling</h3>
+                        <p class="description">Select multiple plugins to display in rotation</p>
+
+                        <div class="form-group">
+                            <label for="cycle_enabled">Enable Plugin Cycling</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="cycle_enabled" name="cycle_enabled" value="true"
+                                       {% if config.get('plugin_cycle', {}).get('enabled', False) %}checked{% endif %}>
+                                <span class="toggle-slider"></span>
+                            </div>
+                            <div class="form-info">When enabled, selected plugins will automatically rotate based on the specified duration.</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Select Plugins to Cycle</label>
+                            <div class="cycle-plugins-grid {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}">
+                                {% for plugin in plugins %}
+                                <div class="cycle-plugin-item">
+                                    <input type="checkbox" id="cycle_plugin_{{ plugin.name }}" name="cycle_plugins" 
+                                           value="{{ plugin.name }}" 
+                                           {% if plugin.name in config.get('plugin_cycle', {}).get('plugins', []) %}checked{% endif %}
+                                           {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}>
+                                    <label for="cycle_plugin_{{ plugin.name }}">
+                                        <i class="fas 
+                                           {% if plugin.name == 'clock' %}fa-clock
+                                           {% elif plugin.name == 'prayer' %}fa-pray
+                                           {% elif plugin.name == 'gif' %}fa-film
+                                           {% elif plugin.name == 'intro' %}fa-image
+                                           {% elif plugin.name == 'moon' %}fa-moon
+                                           {% elif plugin.name == 'weather' %}fa-cloud-sun
+                                           {% elif plugin.name == 'stock' %}fa-chart-line
+                                           {% elif plugin.name == 'wmata' %}fa-subway
+                                           {% else %}fa-puzzle-piece{% endif %}"></i>
+                                        {{ plugin.name|capitalize }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="display_duration">Display Duration (seconds)</label>
+                            <input type="number" id="display_duration" name="display_duration" class="form-control"
+                                   value="{{ config.get('plugin_cycle', {}).get('duration', 30) }}" min="10" max="3600"
+                                   {% if not config.get('plugin_cycle', {}).get('enabled', False) %}disabled{% endif %}>
+                            <div class="form-info">
+                                How long each plugin should stay on screen before switching to the next one.
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Cycling Settings
                         </button>
                     </form>
                 </div>

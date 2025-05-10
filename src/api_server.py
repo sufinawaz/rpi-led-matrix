@@ -245,6 +245,28 @@ class APIServer:
                     "message": f"Brightness set to {brightness}% (will apply on restart)",
                     "applied": "restart"
                 }
+        elif command == 'set_plugin_cycle':
+            enabled = request.get('enabled', False)
+            plugins = request.get('plugins', [])
+            duration = request.get('duration', 30)
+
+            # Validate parameters
+            if not isinstance(enabled, bool):
+                return {"status": "error", "message": "Enabled must be a boolean"}
+            if not isinstance(plugins, list):
+                return {"status": "error", "message": "Plugins must be a list"}
+            if not isinstance(duration, int) or duration < 10 or duration > 3600:
+                return {"status": "error", "message": "Duration must be between 10 and 3600 seconds"}
+
+            # Update the display_manager's plugin cycling settings
+            if hasattr(self.display_manager, 'set_plugin_cycling'):
+                self.display_manager.set_plugin_cycling(enabled, plugins, duration)
+                return {
+                    "status": "success",
+                    "message": "Plugin cycling settings updated"
+                }
+            else:
+                return {"status": "error", "message": "Plugin cycling not supported by display manager"}
 
         else:
             return {"status": "error", "message": f"Unknown command: {command}"}

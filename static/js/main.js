@@ -212,3 +212,40 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 });
+
+// Add this to your JavaScript file
+document.addEventListener('DOMContentLoaded', function() {
+    const cycleEnabled = document.getElementById('cycle_enabled');
+    const pluginCheckboxes = document.querySelectorAll('.cycle-plugins-grid input[type="checkbox"]');
+    const durationInput = document.getElementById('display_duration');
+    const pluginsGrid = document.querySelector('.cycle-plugins-grid');
+
+    if (cycleEnabled) {
+        // Handle change event
+        cycleEnabled.addEventListener('change', function() {
+            // Update plugin checkboxes state
+            pluginCheckboxes.forEach(checkbox => {
+                checkbox.disabled = !this.checked;
+            });
+
+            // Update duration input state
+            if (durationInput) {
+                durationInput.disabled = !this.checked;
+            }
+
+            // Update grid styling
+            if (pluginsGrid) {
+                if (this.checked) {
+                    pluginsGrid.classList.remove('disabled');
+                } else {
+                    pluginsGrid.classList.add('disabled');
+                }
+            }
+
+            console.log('Plugin cycling toggle changed:', this.checked);
+        });
+
+        // Set initial state
+        cycleEnabled.dispatchEvent(new Event('change'));
+    }
+});

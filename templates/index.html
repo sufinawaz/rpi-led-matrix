@@ -291,9 +291,9 @@
                         <div class="form-group">
                             <label for="cycle_enabled">Enable Plugin Cycling</label>
                             <div class="toggle-switch">
-                                </label>
-                                <input type="checkbox" id="cycle_enabled" value="true">
-                                <span class="slider"></span>
+                                <input type="checkbox" id="cycle_enabled" name="cycle_enabled" value="true"
+                                       {% if config.get('plugin_cycle', {}).get('enabled', False) %}checked{% endif %}>
+                                <span class="toggle-slider"></span>
                             </div>
                             <div class="form-info">When enabled, selected plugins will automatically rotate based on the specified duration.</div>
                         </div>

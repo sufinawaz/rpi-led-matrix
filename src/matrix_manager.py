@@ -8,10 +8,10 @@ class MatrixManager:
 
     def __init__(self, 
                  rows=32, 
-                 cols=32, 
+                 cols=64, 
                  chain_length=1, 
                  parallel=1, 
-                 brightness=100,
+                 brightness=30,
                  hardware_mapping="adafruit-hat",
                  gpio_slowdown=2):
         """

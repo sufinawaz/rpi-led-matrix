@@ -375,6 +375,39 @@ def index():
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
 
+    # Get brightness from config.ini
+    import configparser
+
+    # Initialize config data structure
+    config = {}
+    config['matrix'] = {}
+    config['matrix']['brightness'] = 50  # Default brightness
+
+    # Path to the config.ini file in the project root
+    config_path = os.path.join(PROJECT_ROOT, "config.ini")
+
+    # Load the config file if it exists
+    if os.path.exists(config_path):
+        try:
+            parser = configparser.ConfigParser()
+            parser.read(config_path)
+
+            # Read brightness from MATRIX section if it exists
+            if 'MATRIX' in parser and 'brightness' in parser['MATRIX']:
+                try:
+                    brightness = int(parser['MATRIX']['brightness'])
+                    # Ensure valid range
+                    brightness = max(1, min(100, brightness))
+                    config['matrix']['brightness'] = brightness
+                    logger.info(f"Read brightness value from config.ini: {brightness}")
+                except ValueError:
+                    # If the value isn't a valid integer
+                    logger.warning("Invalid brightness value in config.ini")
+        except Exception as e:
+            logger.error(f"Error reading config.ini: {e}")
+    else:
+        logger.info("config.ini not found, using default brightness")
+
     return render_template(
         'index.html', 
         current_mode=current_mode,
@@ -383,7 +416,8 @@ def index():
         is_running=is_running,
         service_status=service_status,
         masked_api_key=masked_api_key,
-        plugins=plugins
+        plugins=plugins,
+        config=config  # Pass the config with brightness value
     )
 
 @app.route('/set_mode/<mode>')
@@ -514,36 +548,39 @@ def update_api_key():
 
 @app.route('/update_brightness', methods=['POST'])
 def update_brightness():
-    """Update the LED matrix brightness"""
+    """Update the LED matrix brightness using config.ini"""
     try:
         brightness = int(request.form.get('brightness', 50))
 
         # Ensure brightness is within valid range
         brightness = max(1, min(100, brightness))
 
-        # Update in config file
-        config = load_config()
-        if "matrix" not in config:
-            config["matrix"] = {}
+        # Update brightness in config.ini file
+        import configparser
 
-        # Store previous brightness to detect changes
-        old_brightness = config["matrix"].get("brightness", 50)
-        config["matrix"]["brightness"] = brightness
-        save_config(config)
+        # Path to the config.ini file in the project root
+        config_path = os.path.join(PROJECT_ROOT, "config.ini")
 
-        # If running with API, try to update brightness directly
-        try:
-            success = api_client.set_brightness(brightness)
-            if success:
-                flash(f"Brightness updated to {brightness}%", "success")
-                return redirect(url_for('index'))
-        except Exception as e:
-            logger.info(f"Could not update brightness via API: {e}")
+        # Create or load the config file
+        config = configparser.ConfigParser()
+        if os.path.exists(config_path):
+            config.read(config_path)
 
-        # If API fails or is not available, restart the service to apply changes
-        if old_brightness != brightness:
-            # Restart service to apply new brightness
-            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+        # Make sure MATRIX section exists
+        if 'MATRIX' not in config:
+            config['MATRIX'] = {}
+
+        # Update the brightness value
+        config['MATRIX']['brightness'] = str(brightness)
+
+        # Save the changes
+        with open(config_path, 'w') as f:
+            config.write(f)
+
+        logger.info(f"Updated brightness to {brightness}% in config.ini")
+
+        # Restart the service to apply changes
+        subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
 
         flash(f"Brightness updated to {brightness}%", "success")
         return redirect(url_for('index'))

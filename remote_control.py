@@ -21,10 +21,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Replace the API client instantiation after the app creation
-app = Flask(__name__)
+app = Flask(__name__, 
+            static_folder='static',
+            template_folder='templates')
 app.secret_key = os.urandom(24)
+
 # Create API client instance
 api_client = APIClient(host='localhost', port=8081)
+
 
 # Use the correct project root directory
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ''))
@@ -33,6 +37,12 @@ GIF_DIR = os.path.join(PROJECT_ROOT, "resources", "images", "gifs")
 
 # Make sure the directories exist
 os.makedirs(GIF_DIR, exist_ok=True)
+os.makedirs(os.path.join(PROJECT_ROOT, "static", "css"), exist_ok=True)
+os.makedirs(os.path.join(PROJECT_ROOT, "static", "js"), exist_ok=True)
+os.makedirs(os.path.join(PROJECT_ROOT, "templates"), exist_ok=True)
+
+app.template_folder = os.path.join(PROJECT_ROOT, "templates")
+app.static_folder = os.path.join(PROJECT_ROOT, "static")
 
 def load_config():
     """Load configuration from file"""

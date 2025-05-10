@@ -384,16 +384,16 @@ def index():
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
+
+    # Initialize config data structure
+    config = {}
+
+    # Add plugin cycling configuration to the config dict
     plugin_cycle_config = load_config().get("plugin_cycle", {})
     if plugin_cycle_config:
         config["plugin_cycle"] = plugin_cycle_config
 
-
-    # Get brightness from config.ini
-    import configparser
-
-    # Initialize config data structure
-    config = {}
+    # Set up matrix config with brightness
     config['matrix'] = {}
     config['matrix']['brightness'] = 50  # Default brightness
 

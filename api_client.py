@@ -128,3 +128,26 @@ class APIClient:
         else:
             logger.error("Failed to get status")
             return None
+
+    def set_brightness(self, brightness):
+        """Set the LED matrix brightness
+
+        Args:
+            brightness: Brightness level (1-100)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        request = {
+            'command': 'set_brightness',
+            'brightness': brightness
+        }
+
+        response = self._send_request(request)
+        if response and response.get('status') == 'success':
+            logger.info(f"Successfully set brightness to {brightness}%")
+            return True
+        else:
+            error_msg = response.get('message', 'Unknown error') if response else 'No response'
+            logger.error(f"Failed to set brightness: {error_msg}")
+            return False

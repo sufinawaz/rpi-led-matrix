@@ -375,6 +375,39 @@ def index():
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
 
+    # Get brightness from config.ini
+    import configparser
+
+    # Initialize config data structure
+    config = {}
+    config['matrix'] = {}
+    config['matrix']['brightness'] = 50  # Default brightness
+
+    # Path to the config.ini file in the project root
+    config_path = os.path.join(PROJECT_ROOT, "config.ini")
+
+    # Load the config file if it exists
+    if os.path.exists(config_path):
+        try:
+            parser = configparser.ConfigParser()
+            parser.read(config_path)
+
+            # Read brightness from MATRIX section if it exists
+            if 'MATRIX' in parser and 'brightness' in parser['MATRIX']:
+                try:
+                    brightness = int(parser['MATRIX']['brightness'])
+                    # Ensure valid range
+                    brightness = max(1, min(100, brightness))
+                    config['matrix']['brightness'] = brightness
+                    logger.info(f"Read brightness value from config.ini: {brightness}")
+                except ValueError:
+                    # If the value isn't a valid integer
+                    logger.warning("Invalid brightness value in config.ini")
+        except Exception as e:
+            logger.error(f"Error reading config.ini: {e}")
+    else:
+        logger.info("config.ini not found, using default brightness")
+
     return render_template(
         'index.html', 
         current_mode=current_mode,
@@ -383,7 +416,8 @@ def index():
         is_running=is_running,
         service_status=service_status,
         masked_api_key=masked_api_key,
-        plugins=plugins
+        plugins=plugins,
+        config=config  # Pass the config with brightness value
     )
 
 @app.route('/set_mode/<mode>')
@@ -511,6 +545,76 @@ def update_api_key():
         logger.error(f"Error updating API key: {e}")
         flash(f"Error updating API key: {e}", "error")
         return redirect(url_for('index'))
+
+@app.route('/update_brightness', methods=['POST'])
+def update_brightness():
+    """Update the LED matrix brightness in real-time"""
+    try:
+        brightness = int(request.form.get('brightness', 50))
+
+        # Ensure brightness is within valid range
+        brightness = max(1, min(100, brightness))
+
+        # Store whether we succeeded with direct update
+        direct_update_success = False
+
+        # Step 1: Update brightness in config.ini file for persistence
+        import configparser
+
+        # Path to the config.ini file in the project root
+        config_path = os.path.join(PROJECT_ROOT, "config.ini")
+
+        # Create or load the config file
+        config = configparser.ConfigParser()
+        if os.path.exists(config_path):
+            config.read(config_path)
+
+        # Make sure MATRIX section exists
+        if 'MATRIX' not in config:
+            config['MATRIX'] = {}
+
+        # Update the brightness value
+        config['MATRIX']['brightness'] = str(brightness)
+
+        # Save the changes
+        with open(config_path, 'w') as f:
+            config.write(f)
+
+        logger.info(f"Updated brightness to {brightness}% in config.ini")
+
+        # Step 2: Try to update brightness directly using API client
+        try:
+            response = api_client.set_brightness(brightness)
+            if response and isinstance(response, dict):
+                # Check if update was applied immediately
+                if response.get('applied') == 'immediate':
+                    direct_update_success = True
+                    logger.info("Brightness updated immediately via API")
+                else:
+                    logger.info("API reports brightness will apply on restart")
+            elif response:
+                # Boolean response (legacy)
+                direct_update_success = True
+                logger.info("Brightness updated via API (legacy response)")
+        except Exception as e:
+            logger.info(f"Could not update brightness via API: {e}")
+
+        # Step 3: If API direct update succeeded, we're done!
+        if direct_update_success:
+            flash(f"Brightness updated to {brightness}%", "success")
+            return redirect(url_for('index'))
+
+        # Step 4: If direct update failed, try restart as last resort
+        logger.info("Direct brightness update not available, restarting service")
+        subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+        flash(f"Brightness updated to {brightness}% (required restart)", "success")
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error updating brightness: {e}")
+        flash(f"Error updating brightness: {e}", "error")
+        return redirect(url_for('index'))
+
 
 @app.route('/plugin_config/<plugin_name>', methods=['GET', 'POST'])
 def plugin_config(plugin_name):

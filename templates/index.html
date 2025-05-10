@@ -145,11 +145,11 @@
             border-radius: 50%;
         }
 
-        input:checked + .slider {
+        input:checked+.slider {
             background-color: var(--primary);
         }
 
-        input:checked + .slider:before {
+        input:checked+.slider:before {
             transform: translateX(26px);
         }
 
@@ -163,7 +163,7 @@
             transition: .4s;
         }
 
-        input:checked + .slider:after {
+        input:checked+.slider:after {
             opacity: 1;
         }
 
@@ -176,7 +176,7 @@
             color: #f97316;
         }
 
-        input:checked + .slider:before {
+        input:checked+.slider:before {
             content: '';
             background-color: white;
         }
@@ -335,7 +335,8 @@
             background-color: var(--border-color);
         }
 
-        .btn[disabled], .btn.disabled {
+        .btn[disabled],
+        .btn.disabled {
             opacity: 0.6;
             cursor: not-allowed;
             pointer-events: none;
@@ -450,8 +451,13 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .gif-grid {
@@ -647,14 +653,81 @@
             font-size: 1.25rem;
         }
 
+        .brightness-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .brightness-slider {
+            flex: 1;
+            height: 8px;
+            -webkit-appearance: none;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .brightness-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .brightness-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .brightness-slider::-webkit-slider-thumb:hover {
+            background: var(--primary-hover);
+            transform: scale(1.1);
+        }
+
+        .brightness-value {
+            min-width: 45px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .settings-divider {
+            margin: 30px 0;
+            border: none;
+            border-top: 1px solid var(--border-color);
+        }
+
         @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; transform: translateY(-10px); }
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
         }
 
         /* Responsive adjustments */
@@ -741,13 +814,16 @@
 
                 <!-- Power control buttons -->
                 <div class="button-group">
-                    <a href="{{ url_for('start_service_route') }}" class="btn btn-success" {% if is_running %}disabled{% endif %}>
+                    <a href="{{ url_for('start_service_route') }}" class="btn btn-success" {% if is_running %}disabled{%
+                        endif %}>
                         <i class="fas fa-play"></i> Start
                     </a>
-                    <a href="{{ url_for('restart_service') }}" class="btn btn-warning" {% if not is_running %}disabled{% endif %}>
+                    <a href="{{ url_for('restart_service') }}" class="btn btn-warning" {% if not is_running %}disabled{%
+                        endif %}>
                         <i class="fas fa-redo"></i> Restart
                     </a>
-                    <a href="{{ url_for('stop_service_route') }}" class="btn btn-danger" {% if not is_running %}disabled{% endif %}>
+                    <a href="{{ url_for('stop_service_route') }}" class="btn btn-danger" {% if not is_running
+                        %}disabled{% endif %}>
                         <i class="fas fa-stop"></i> Stop
                     </a>
                 </div>
@@ -789,10 +865,13 @@
                         </div>
                         <div class="plugin-description">{{ plugin.description }}</div>
                         <div class="plugin-actions">
-                            <a href="{{ url_for('set_mode', mode=plugin.name) }}" class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not is_running %}disabled{% endif %}>
+                            <a href="{{ url_for('set_mode', mode=plugin.name) }}"
+                                class="btn btn-primary btn-sm {% if plugin.active %}active{% endif %}" {% if not
+                                is_running %}disabled{% endif %}>
                                 <i class="fas fa-play"></i> Activate
                             </a>
-                            <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}" class="btn btn-secondary btn-sm">
+                            <a href="{{ url_for('plugin_config', plugin_name=plugin.name) }}"
+                                class="btn btn-secondary btn-sm">
                                 <i class="fas fa-cog"></i> Configure
                             </a>
                         </div>
@@ -806,7 +885,8 @@
         <div class="card">
             <div class="card-header">
                 <h2><i class="fas fa-images"></i> GIFs</h2>
-                <div class="status-indicator {% if current_mode == 'gif' %}status-active{% else %}status-inactive{% endif %}">
+                <div
+                    class="status-indicator {% if current_mode == 'gif' %}status-active{% else %}status-inactive{% endif %}">
                     <span class="status-dot"></span>
                     {% if current_mode == 'gif' %}Active{% else %}Inactive{% endif %}
                 </div>
@@ -838,7 +918,8 @@
                                 <div class="gif-actions">
                                     <form action="{{ url_for('set_gif') }}" method="post" style="flex: 1;">
                                         <input type="hidden" name="gif_name" value="{{ gif }}">
-                                        <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if not is_running %}disabled{% endif %}>
+                                        <button type="submit" class="btn btn-success btn-sm gif-action-btn" {% if not
+                                            is_running %}disabled{% endif %}>
                                             <i class="fas fa-play"></i>
                                         </button>
                                     </form>
@@ -854,7 +935,8 @@
                     </div>
                     {% else %}
                     <div style="text-align: center; padding: 40px 20px;">
-                        <i class="fas fa-film" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 15px;"></i>
+                        <i class="fas fa-film"
+                            style="font-size: 3rem; color: var(--text-muted); margin-bottom: 15px;"></i>
                         <p>No GIFs available. Add some using the tabs above!</p>
                     </div>
                     {% endif %}
@@ -916,12 +998,33 @@
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
-                                                    <div class="form-info">
-                            Get your API key at <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a>
+                        <div class="form-info">
+                            Get your API key at <a href="https://openweathermap.org/api"
+                                target="_blank">OpenWeatherMap</a>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </form>
+                <hr class="settings-divider">
+
+                <form action="{{ url_for('update_brightness') }}" method="post">
+                    <div class="form-group">
+                        <label for="brightness">LED Matrix Brightness</label>
+                        <div class="brightness-control">
+                            <i class="fas fa-sun" style="color: var(--text-secondary); font-size: 0.9rem;"></i>
+                            <input type="range" id="brightness" name="brightness" min="1" max="100"
+                                value="{{ config.get('matrix', {}).get('brightness', 50) }}" class="brightness-slider">
+                            <span class="brightness-value">{{ config.get('matrix', {}).get('brightness', 50) }}%</span>
+                            <i class="fas fa-sun" style="color: var(--text-primary); font-size: 1.2rem;"></i>
+                        </div>
+                        <div class="form-info">
+                            Adjust the brightness level of the LED matrix display (1-100%)
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sun"></i> Update Brightness
                     </button>
                 </form>
             </div>
@@ -931,14 +1034,15 @@
             <p>InfoCube Remote Control v1.2</p>
             <div class="footer-links">
                 <a href="#" class="footer-link"><i class="fas fa-lightbulb"></i> Help</a>
-                <a href="https://github.com/yourusername/infocube" class="footer-link" target="_blank"><i class="fab fa-github"></i> GitHub</a>
+                <a href="https://github.com/yourusername/infocube" class="footer-link" target="_blank"><i
+                        class="fab fa-github"></i> GitHub</a>
             </div>
         </footer>
     </div>
 
     <script>
         // Theme toggle functionality
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const themeToggle = document.getElementById('theme-toggle');
 
             // Check for saved theme preference or use device preference
@@ -949,7 +1053,7 @@
             }
 
             // Theme toggle event listener
-            themeToggle.addEventListener('change', function() {
+            themeToggle.addEventListener('change', function () {
                 if (this.checked) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                     localStorage.setItem('theme', 'dark');
@@ -980,7 +1084,7 @@
             });
 
             // Toggle API key visibility
-            document.getElementById('toggle-api-key').addEventListener('click', function() {
+            document.getElementById('toggle-api-key').addEventListener('click', function () {
                 const apiKeyInput = document.getElementById('weather_api_key');
                 const toggleIcon = this.querySelector('i');
 
@@ -994,6 +1098,15 @@
                     toggleIcon.classList.add('fa-eye');
                 }
             });
+
+            // Live update for brightness slider
+            const brightnessSlider = document.getElementById('brightness');
+            const brightnessValue = document.querySelector('.brightness-value');
+            if (brightnessSlider && brightnessValue) {
+                brightnessSlider.addEventListener('input', function () {
+                    brightnessValue.textContent = this.value + '%';
+                });
+            }
 
             // Auto-hide flash messages after 6 seconds
             const flashMessages = document.querySelectorAll('.flash');
@@ -1011,4 +1124,5 @@
         });
     </script>
 </body>
+
 </html>

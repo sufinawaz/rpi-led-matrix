@@ -8,10 +8,10 @@ class MatrixManager:
 
     def __init__(self, 
                  rows=32, 
-                 cols=32, 
+                 cols=64, 
                  chain_length=1, 
                  parallel=1, 
-                 brightness=100,
+                 brightness=30,
                  hardware_mapping="adafruit-hat",
                  gpio_slowdown=2):
         """
@@ -65,6 +65,39 @@ class MatrixManager:
     def swap(self):
         """Update the display by swapping the canvas"""
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def set_brightness(self, brightness):
+        """Set the brightness of the LED matrix
+
+        Args:
+            brightness: Brightness level (0-100)
+        """
+        # Ensure brightness is within valid range
+        brightness = max(0, min(100, brightness))
+
+        # Update options
+        self.options.brightness = brightness
+
+        # Apply brightness setting directly to the matrix
+        try:
+            # Method 1: If matrix has a setBrightness method
+            if hasattr(self.matrix, 'setBrightness'):
+                self.matrix.setBrightness(brightness)
+                return True
+            # Method 2: Try to access brightness property directly
+            elif hasattr(self.matrix, 'brightness'):
+                self.matrix.brightness = brightness
+                return True
+            # Method 3: Try rpi-rgb-led-matrix specific methods
+            elif hasattr(self.matrix, 'luminanceCorrect'):
+                self.matrix.luminanceCorrect(brightness/100.0)
+                return True
+        except Exception as e:
+            print(f"Error setting brightness: {e}")
+            return False
+
+        # Can't set brightness directly - matrix might need to be reinitialized
+        return False
 
     def __del__(self):
         """Clean up by clearing the display when done"""

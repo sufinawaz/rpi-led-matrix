@@ -178,5 +178,73 @@ class APIServer:
                 }
             }
 
+        elif command == 'set_brightness':
+            brightness = request.get('brightness', 50)
+            if not isinstance(brightness, int) or brightness < 1 or brightness > 100:
+                return {"status": "error", "message": "Invalid brightness value"}
+
+            # Try to update brightness directly using matrix_manager
+            direct_update_success = False
+            try:
+                # Update the matrix directly if possible
+                if hasattr(self.display_manager.matrix, 'set_brightness'):
+                    direct_update_success = self.display_manager.matrix.set_brightness(brightness)
+                # Try alternate method if available
+                elif hasattr(self.display_manager.matrix, 'setBrightness'):
+                    self.display_manager.matrix.setBrightness(brightness)
+                    direct_update_success = True
+                # Another possibility
+                elif hasattr(self.display_manager.matrix, 'brightness'):
+                    self.display_manager.matrix.brightness = brightness
+                    direct_update_success = True
+            except Exception as e:
+                logger.error(f"Error updating brightness directly: {e}")
+
+            # Update config.ini so it persists for next startup
+            try:
+                import configparser
+                import os
+
+                # Get the path to config.ini
+                config_path = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
+
+                # Load existing config or create new
+                config = configparser.ConfigParser()
+                if os.path.exists(config_path):
+                    config.read(config_path)
+
+                # Ensure MATRIX section exists
+                if 'MATRIX' not in config:
+                    config['MATRIX'] = {}
+
+                # Update brightness
+                config['MATRIX']['brightness'] = str(brightness)
+
+                # Save changes
+                with open(config_path, 'w') as f:
+                    config.write(f)
+
+                logger.info(f"Updated brightness to {brightness} in config.ini")
+            except Exception as e:
+                logger.error(f"Error updating config.ini: {e}")
+                return {
+                    "status": "error", 
+                    "message": f"Failed to update brightness in config: {e}"
+                }
+
+            # Return success message with info on whether it was applied immediately
+            if direct_update_success:
+                return {
+                    "status": "success",
+                    "message": f"Brightness set to {brightness}%",
+                    "applied": "immediate"
+                }
+            else:
+                return {
+                    "status": "success",
+                    "message": f"Brightness set to {brightness}% (will apply on restart)",
+                    "applied": "restart"
+                }
+
         else:
             return {"status": "error", "message": f"Unknown command: {command}"}

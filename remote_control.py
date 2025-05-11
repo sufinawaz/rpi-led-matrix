@@ -384,7 +384,9 @@ def index():
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
-
+    
+    # Get brightness from config.ini
+    import configparser
     # Initialize config data structure
     config = {}
 

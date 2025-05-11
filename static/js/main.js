@@ -1,187 +1,251 @@
-/**
- * InfoCube Remote Control JavaScript
- * Handles UI interactivity and tab persistence
- */
-document.addEventListener('DOMContentLoaded', function() {
-    // Theme toggle functionality
-    initThemeToggle();
+document.addEventListener('DOMContentLoaded', function () {
+  // Dark/Light theme toggle
+  const themeToggle = document.getElementById('theme-toggle');
+  const storedTheme = localStorage.getItem('theme');
 
-    // Initialize main tabs with persistence
-    initMainTabs();
+  // Apply stored theme on page load
+  if (storedTheme === 'dark') {
+    document.body.classList.add('dark-theme');
+    themeToggle.checked = true;
+  }
 
-    // Initialize GIF subtabs with persistence
-    initGifTabs();
+  // Toggle theme on switch change
+  themeToggle.addEventListener('change', function () {
+    if (this.checked) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  });
 
-    // Initialize interactive UI elements
-    initBrightnessSlider();
-    initPasswordToggle();
-    initFlashMessages();
+  // Main tabs functionality
+  const mainTabs = document.querySelectorAll('.main-tab');
+  const mainTabContents = document.querySelectorAll('.main-tab-content');
+
+  // Handle main tab clicks
+  mainTabs.forEach((tab) => {
+    tab.addEventListener('click', function () {
+      const tabId = this.getAttribute('data-main-tab');
+
+      // Remove active class from all tabs
+      mainTabs.forEach((t) => t.classList.remove('active'));
+
+      // Add active class to current tab
+      this.classList.add('active');
+
+      // Hide all tab content
+      mainTabContents.forEach((content) => (content.style.display = 'none'));
+
+      // Show selected tab content
+      document.getElementById(`${tabId}-content`).style.display = 'block';
+
+      // Store the active tab in session storage
+      localStorage.setItem('activeMainTab', tabId);
+    });
+  });
+
+  // GIF subtabs functionality
+  const gifTabs = document.querySelectorAll('.gif-tab');
+  const gifTabContents = document.querySelectorAll('.tab-content');
+
+  gifTabs.forEach((tab) => {
+    tab.addEventListener('click', function () {
+      const tabId = this.getAttribute('data-tab');
+
+      // Remove active class from all tabs
+      gifTabs.forEach((t) => t.classList.remove('active'));
+
+      // Add active class to current tab
+      this.classList.add('active');
+
+      // Hide all tab content
+      gifTabContents.forEach((content) => content.classList.remove('active'));
+
+      // Show selected tab content
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
+  // Restore previously active tab
+  const activeMainTab = localStorage.getItem('activeMainTab');
+  if (activeMainTab) {
+    const tab = document.querySelector(`[data-main-tab="${activeMainTab}"]`);
+    if (tab) {
+      tab.click();
+    }
+  }
+
+  // Flash messages auto-dismiss
+  const flashMessages = document.querySelectorAll('.flash');
+  flashMessages.forEach((message) => {
+    setTimeout(() => {
+      message.style.opacity = '0';
+      setTimeout(() => {
+        message.style.display = 'none';
+      }, 500);
+    }, 5000);
+  });
+
+  // Toggle password visibility for API key
+  const toggleApiKey = document.getElementById('toggle-api-key');
+  if (toggleApiKey) {
+    toggleApiKey.addEventListener('click', function () {
+      const apiKeyInput = document.getElementById('weather_api_key');
+      const type = apiKeyInput.getAttribute('type');
+
+      if (type === 'password') {
+        apiKeyInput.setAttribute('type', 'text');
+        this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+      } else {
+        apiKeyInput.setAttribute('type', 'password');
+        this.innerHTML = '<i class="fas fa-eye"></i>';
+      }
+    });
+  }
+
+  // Brightness slider
+  const brightnessSlider = document.getElementById('brightness');
+  const brightnessValue = document.querySelector('.brightness-value');
+
+  if (brightnessSlider && brightnessValue) {
+    brightnessSlider.addEventListener('input', function () {
+      brightnessValue.textContent = this.value + '%';
+    });
+  }
+
+  // Add this to your existing JavaScript, or replace the cycling toggle handling section:
+
+  // Plugin cycling toggle - with debug
+  console.log('Loading plugin cycling toggle handlers');
+  const cycleEnabledToggle = document.getElementById('cycle_enabled');
+  const cyclePluginsGrid = document.querySelector('.cycle-plugins-grid');
+  const displayDurationInput = document.getElementById('display_duration');
+
+  if (cycleEnabledToggle) {
+    console.log('Found cycle_enabled toggle element');
+
+    // Function to toggle the disabled state of cycling options
+    function updateCyclingOptionsState() {
+      console.log('Toggle changed: ' + cycleEnabledToggle.checked);
+      const isEnabled = cycleEnabledToggle.checked;
+
+      // Enable/disable plugin checkboxes
+      if (cyclePluginsGrid) {
+        console.log('Updating plugin checkboxes state');
+        const pluginCheckboxes = cyclePluginsGrid.querySelectorAll(
+          'input[type="checkbox"]'
+        );
+        pluginCheckboxes.forEach((checkbox) => {
+          checkbox.disabled = !isEnabled;
+        });
+
+        // Add/remove disabled styling
+        if (isEnabled) {
+          cyclePluginsGrid.classList.remove('disabled');
+        } else {
+          cyclePluginsGrid.classList.add('disabled');
+        }
+      } else {
+        console.log('Could not find cycle plugins grid');
+      }
+
+      // Enable/disable duration input
+      if (displayDurationInput) {
+        console.log('Updating duration input state');
+        displayDurationInput.disabled = !isEnabled;
+      } else {
+        console.log('Could not find display duration input');
+      }
+    }
+
+    // Set initial state
+    console.log(
+      'Setting initial state, isChecked: ' + cycleEnabledToggle.checked
+    );
+    updateCyclingOptionsState();
+
+    // Update state when toggle changes
+    cycleEnabledToggle.addEventListener('change', function (e) {
+      console.log('Toggle checkbox change event fired');
+      updateCyclingOptionsState();
+    });
+
+    // Add click handler directly to the toggle-slider element
+    const toggleSlider = document.querySelector('.toggle-slider');
+    if (toggleSlider) {
+      console.log('Found toggle slider, adding click handler');
+      toggleSlider.addEventListener('click', function (e) {
+        console.log('Toggle slider clicked');
+        // Toggle the checkbox
+        cycleEnabledToggle.checked = !cycleEnabledToggle.checked;
+        // Trigger the change event manually
+        const event = new Event('change');
+        cycleEnabledToggle.dispatchEvent(event);
+      });
+    } else {
+      console.log('Could not find toggle slider');
+    }
+  } else {
+    console.log('Could not find cycle_enabled toggle element');
+  }
+
+  // Form validation for cycling settings
+  const cyclingForm = document.querySelector(
+    'form[action*="update_plugin_cycle"]'
+  );
+  if (cyclingForm) {
+    cyclingForm.addEventListener('submit', function (e) {
+      const isEnabled = document.getElementById('cycle_enabled').checked;
+
+      if (isEnabled) {
+        // Check if at least one plugin is selected
+        const selectedPlugins = document.querySelectorAll(
+          'input[name="cycle_plugins"]:checked'
+        );
+        if (selectedPlugins.length === 0) {
+          e.preventDefault();
+          alert('Please select at least one plugin for cycling.');
+        }
+      }
+    });
+  }
 });
 
-/**
- * Initialize light/dark theme toggle
- */
-function initThemeToggle() {
-    const themeToggle = document.getElementById('theme-toggle');
-    if (!themeToggle) return;
+// Add this to your JavaScript file
+document.addEventListener('DOMContentLoaded', function() {
+    const cycleEnabled = document.getElementById('cycle_enabled');
+    const pluginCheckboxes = document.querySelectorAll('.cycle-plugins-grid input[type="checkbox"]');
+    const durationInput = document.getElementById('display_duration');
+    const pluginsGrid = document.querySelector('.cycle-plugins-grid');
 
-    // Check for saved theme preference or use device preference
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (cycleEnabled) {
+        // Handle change event
+        cycleEnabled.addEventListener('change', function() {
+            // Update plugin checkboxes state
+            pluginCheckboxes.forEach(checkbox => {
+                checkbox.disabled = !this.checked;
+            });
 
-    // Apply theme based on preference
-    if (savedTheme === 'dark' || (!savedTheme && prefersDarkMode)) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        themeToggle.checked = true;
-    }
+            // Update duration input state
+            if (durationInput) {
+                durationInput.disabled = !this.checked;
+            }
 
-    // Listen for theme toggle changes
-    themeToggle.addEventListener('change', function() {
-        if (this.checked) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-            localStorage.setItem('theme', 'light');
-        }
-    });
-}
+            // Update grid styling
+            if (pluginsGrid) {
+                if (this.checked) {
+                    pluginsGrid.classList.remove('disabled');
+                } else {
+                    pluginsGrid.classList.add('disabled');
+                }
+            }
 
-/**
- * Initialize main tabs (Plugins, GIFs, Settings)
- */
-function initMainTabs() {
-    const mainTabs = document.querySelectorAll('.main-tab');
-    const mainTabContents = document.querySelectorAll('.main-tab-content');
-
-    if (!mainTabs.length) return;
-
-    // Check localStorage for last selected tab
-    const lastMainTab = localStorage.getItem('lastMainTab') || 'plugins';
-
-    // Set initial active tab based on localStorage
-    activateMainTab(lastMainTab);
-
-    // Add click event listeners to main tabs
-    mainTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabId = tab.getAttribute('data-main-tab');
-            activateMainTab(tabId);
-
-            // Save to localStorage
-            localStorage.setItem('lastMainTab', tabId);
+            console.log('Plugin cycling toggle changed:', this.checked);
         });
-    });
 
-    // Function to activate the selected tab
-    function activateMainTab(tabId) {
-        // Remove active class from all tabs and contents
-        mainTabs.forEach(t => t.classList.remove('active'));
-        mainTabContents.forEach(c => c.classList.remove('active'));
-
-        // Add active class to selected tab and content
-        const selectedTab = document.querySelector(`[data-main-tab="${tabId}"]`);
-        const selectedContent = document.getElementById(`${tabId}-content`);
-
-        if (selectedTab) selectedTab.classList.add('active');
-        if (selectedContent) selectedContent.classList.add('active');
+        // Set initial state
+        cycleEnabled.dispatchEvent(new Event('change'));
     }
-}
-
-/**
- * Initialize GIF subtabs (Gallery, Add from URL, Upload)
- */
-function initGifTabs() {
-    const gifTabs = document.querySelectorAll('.gif-tab');
-    const gifTabContents = document.querySelectorAll('.tab-content');
-
-    if (!gifTabs.length) return;
-
-    // Check localStorage for last selected GIF tab
-    const lastGifTab = localStorage.getItem('lastGifTab') || 'existing-gifs';
-
-    // Set initial active GIF tab based on localStorage
-    activateGifTab(lastGifTab);
-
-    // Add click event listeners to GIF tabs
-    gifTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabId = tab.getAttribute('data-tab');
-            activateGifTab(tabId);
-
-            // Save to localStorage
-            localStorage.setItem('lastGifTab', tabId);
-        });
-    });
-
-    // Function to activate the selected GIF tab
-    function activateGifTab(tabId) {
-        // Remove active class from all tabs and contents
-        gifTabs.forEach(t => t.classList.remove('active'));
-        gifTabContents.forEach(c => c.classList.remove('active'));
-
-        // Add active class to selected tab and content
-        const selectedTab = document.querySelector(`[data-tab="${tabId}"]`);
-        const selectedContent = document.getElementById(tabId);
-
-        if (selectedTab) selectedTab.classList.add('active');
-        if (selectedContent) selectedContent.classList.add('active');
-    }
-}
-
-/**
- * Initialize brightness slider with live preview
- */
-function initBrightnessSlider() {
-    const brightnessSlider = document.getElementById('brightness');
-    const brightnessValue = document.querySelector('.brightness-value');
-
-    if (!brightnessSlider || !brightnessValue) return;
-
-    brightnessSlider.addEventListener('input', function() {
-        brightnessValue.textContent = this.value + '%';
-    });
-}
-
-/**
- * Initialize password toggle for API key field
- */
-function initPasswordToggle() {
-    const toggleApiKey = document.getElementById('toggle-api-key');
-    const apiKeyInput = document.getElementById('weather_api_key');
-
-    if (!toggleApiKey || !apiKeyInput) return;
-
-    toggleApiKey.addEventListener('click', function() {
-        const toggleIcon = this.querySelector('i');
-
-        if (apiKeyInput.type === 'password') {
-            apiKeyInput.type = 'text';
-            toggleIcon.classList.remove('fa-eye');
-            toggleIcon.classList.add('fa-eye-slash');
-        } else {
-            apiKeyInput.type = 'password';
-            toggleIcon.classList.remove('fa-eye-slash');
-            toggleIcon.classList.add('fa-eye');
-        }
-    });
-}
-
-/**
- * Initialize auto-hide for flash messages
- */
-function initFlashMessages() {
-    const flashMessages = document.querySelectorAll('.flash');
-
-    if (!flashMessages.length) return;
-
-    setTimeout(() => {
-        flashMessages.forEach(message => {
-            message.style.opacity = '0';
-            message.style.transform = 'translateY(-10px)';
-            setTimeout(() => {
-                message.style.display = 'none';
-            }, 300);
-        });
-    }, 6000);
-}
+});

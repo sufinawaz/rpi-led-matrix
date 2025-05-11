@@ -384,12 +384,18 @@ def index():
     available_gifs = scan_gifs()
     masked_api_key = get_masked_api_key()
     plugins = get_plugins()
-
+    
     # Get brightness from config.ini
     import configparser
-
     # Initialize config data structure
     config = {}
+
+    # Add plugin cycling configuration to the config dict
+    plugin_cycle_config = load_config().get("plugin_cycle", {})
+    if plugin_cycle_config:
+        config["plugin_cycle"] = plugin_cycle_config
+
+    # Set up matrix config with brightness
     config['matrix'] = {}
     config['matrix']['brightness'] = 50  # Default brightness
 
@@ -967,6 +973,81 @@ def api_list_gifs():
     """API endpoint to list available GIFs"""
     gifs = scan_gifs()
     return jsonify(gifs)
+
+@app.route('/update_plugin_cycle', methods=['POST'])
+def update_plugin_cycle():
+    """Update plugin cycling settings"""
+    try:
+        # Debug: Log the form data
+        logger.info(f"Plugin cycle form data: {dict(request.form)}")
+
+        # Get form data
+        cycle_enabled = 'cycle_enabled' in request.form
+        logger.info(f"Cycle enabled: {cycle_enabled}")
+
+        cycle_plugins = request.form.getlist('cycle_plugins')
+        logger.info(f"Selected plugins: {cycle_plugins}")
+
+        display_duration = int(request.form.get('display_duration', 30))
+        logger.info(f"Display duration: {display_duration}s")
+
+        # Validate display duration
+        display_duration = max(10, min(3600, display_duration))
+
+        # Ensure at least one plugin is selected when enabled
+        if cycle_enabled and not cycle_plugins:
+            logger.warning("No plugins selected but cycling is enabled")
+            flash("Please select at least one plugin for cycling", "error")
+            return redirect(url_for('index'))
+
+        # Update config structure
+        config = load_config()
+        logger.info(f"Original config: {config.get('plugin_cycle', {})}")
+
+        if "plugin_cycle" not in config:
+            config["plugin_cycle"] = {}
+
+        config["plugin_cycle"]["enabled"] = cycle_enabled
+        config["plugin_cycle"]["plugins"] = cycle_plugins
+        config["plugin_cycle"]["duration"] = display_duration
+        config["plugin_cycle"]["last_switch"] = int(time.time())  # Current time
+
+        # Debug: Log the updated config
+        logger.info(f"Updated config: {config['plugin_cycle']}")
+
+        # Save the updated config
+        saved = save_config(config)
+        logger.info(f"Config saved: {saved}")
+
+        # If cycling is enabled, update our API service and restart
+        if cycle_enabled:
+            # Use API client if available
+            try:
+                logger.info("Attempting to use API client for plugin cycling")
+                result = api_client.set_plugin_cycle(cycle_enabled, cycle_plugins, display_duration)
+                logger.info(f"API client result: {result}")
+
+                if not result:
+                    # Fall back to restart method
+                    logger.info("API client failed, falling back to restart method")
+                    subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+            except Exception as e:
+                logger.error(f"API client error: {e}")
+                # Fall back to restart method
+                logger.info("API client exception, falling back to restart method")
+                subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+        else:
+            # If disabling, we need to restart the service
+            logger.info("Cycling disabled, restarting service to apply")
+            subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
+
+        flash("Plugin cycling settings updated successfully", "success")
+
+    except Exception as e:
+        logger.error(f"Error updating plugin cycling settings: {e}")
+        flash(f"Error updating plugin cycling settings: {e}", "error")
+
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     # Start the web server

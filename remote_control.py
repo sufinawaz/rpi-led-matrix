@@ -974,6 +974,64 @@ def api_list_gifs():
     gifs = scan_gifs()
     return jsonify(gifs)
 
+@app.route('/set_mode_disable_cycling/<mode>')
+def set_mode_disable_cycling(mode):
+    """Set mode and disable plugin cycling"""
+    logger.info(f"Setting mode to: {mode} and disabling cycling")
+    
+    # 1. Disable cycling in the config
+    config = load_config()
+    if "plugin_cycle" not in config:
+        config["plugin_cycle"] = {}
+    
+    # Set cycling to disabled
+    config["plugin_cycle"]["enabled"] = False
+    
+    # Save the config
+    save_config(config)
+    
+    # 2. Try to disable cycling via API
+    try:
+        # Keep the existing plugins list and duration, just disable cycling
+        cycle_plugins = config.get("plugin_cycle", {}).get("plugins", [])
+        duration = config.get("plugin_cycle", {}).get("duration", 30)
+        api_client.set_plugin_cycle(False, cycle_plugins, duration)
+    except Exception as e:
+        logger.error(f"Error updating plugin cycling via API: {e}")
+        # No need to handle, we'll restart the service anyway
+    
+    # 3. Activate the requested mode (will restart service)
+    # Special handling for gif mode - select a default gif if needed
+    if mode == 'gif':
+        # Get the current gif configuration
+        gif_config = get_plugin_config('gif')
+        current_gif = gif_config.get('current_gif', '')
+
+        # Get list of available gifs
+        available_gifs = scan_gifs()
+
+        # If no current gif or the current one doesn't exist, select the first available
+        if not current_gif or (available_gifs and current_gif not in available_gifs):
+            if available_gifs:
+                current_gif = available_gifs[0]
+                gif_config['current_gif'] = current_gif
+                update_plugin_config('gif', gif_config)
+
+        # If we have a valid gif, use it
+        if current_gif:
+            change_display_mode('gif', current_gif)
+            flash(f"Switched to animation mode: {current_gif} (cycling disabled)", "success")
+        else:
+            # No gifs available
+            flash("No animations available. Please add some GIFs first.", "error")
+            return redirect(url_for('index'))
+    else:
+        # Normal mode switching
+        change_display_mode(mode)
+        flash(f"Switched to {mode} mode (cycling disabled)", "success")
+
+    return redirect(url_for('index'))
+
 @app.route('/update_plugin_cycle', methods=['POST'])
 def update_plugin_cycle():
     """Update plugin cycling settings"""
@@ -982,8 +1040,13 @@ def update_plugin_cycle():
         logger.info(f"Plugin cycle form data: {dict(request.form)}")
 
         # Get form data
-        cycle_enabled = 'cycle_enabled' in request.form
-        logger.info(f"Cycle enabled: {cycle_enabled}")
+        # Read the current state to determine if we're turning cycling on or off
+        config = load_config()
+        current_cycling_state = config.get("plugin_cycle", {}).get("enabled", False)
+        
+        # Toggle the cycling state (enable if disabled, disable if enabled)
+        cycle_enabled = not current_cycling_state
+        logger.info(f"Toggling cycling from {current_cycling_state} to {cycle_enabled}")
 
         cycle_plugins = request.form.getlist('cycle_plugins')
         logger.info(f"Selected plugins: {cycle_plugins}")
@@ -994,16 +1057,13 @@ def update_plugin_cycle():
         # Validate display duration
         display_duration = max(10, min(3600, display_duration))
 
-        # Ensure at least one plugin is selected when enabled
+        # Ensure at least one plugin is selected when enabling
         if cycle_enabled and not cycle_plugins:
-            logger.warning("No plugins selected but cycling is enabled")
+            logger.warning("No plugins selected but trying to enable cycling")
             flash("Please select at least one plugin for cycling", "error")
             return redirect(url_for('index'))
 
         # Update config structure
-        config = load_config()
-        logger.info(f"Original config: {config.get('plugin_cycle', {})}")
-
         if "plugin_cycle" not in config:
             config["plugin_cycle"] = {}
 
@@ -1019,29 +1079,26 @@ def update_plugin_cycle():
         saved = save_config(config)
         logger.info(f"Config saved: {saved}")
 
-        # If cycling is enabled, update our API service and restart
-        if cycle_enabled:
-            # Use API client if available
-            try:
-                logger.info("Attempting to use API client for plugin cycling")
-                result = api_client.set_plugin_cycle(cycle_enabled, cycle_plugins, display_duration)
-                logger.info(f"API client result: {result}")
+        # Use API client if available
+        try:
+            logger.info(f"Attempting to use API client for plugin cycling (enabled={cycle_enabled})")
+            result = api_client.set_plugin_cycle(cycle_enabled, cycle_plugins, display_duration)
+            logger.info(f"API client result: {result}")
 
-                if not result:
-                    # Fall back to restart method
-                    logger.info("API client failed, falling back to restart method")
-                    subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
-            except Exception as e:
-                logger.error(f"API client error: {e}")
+            if not result:
                 # Fall back to restart method
-                logger.info("API client exception, falling back to restart method")
+                logger.info("API client failed, falling back to restart method")
                 subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
-        else:
-            # If disabling, we need to restart the service
-            logger.info("Cycling disabled, restarting service to apply")
+        except Exception as e:
+            logger.error(f"API client error: {e}")
+            # Fall back to restart method
+            logger.info("API client exception, falling back to restart method")
             subprocess.run(["sudo", "systemctl", "restart", "infocube-display.service"], check=True)
 
-        flash("Plugin cycling settings updated successfully", "success")
+        if cycle_enabled:
+            flash("Plugin cycling has been enabled", "success")
+        else:
+            flash("Plugin cycling has been disabled", "success")
 
     except Exception as e:
         logger.error(f"Error updating plugin cycling settings: {e}")

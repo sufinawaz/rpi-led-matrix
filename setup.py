@@ -139,7 +139,7 @@ def install_system_packages():
             "python3-setuptools",
             "libgraphicsmagick++-dev",
             "libwebp-dev",
-            "git"
+            "cython3"  # Added cython3 to prevent build failures
         ]
 
         apt_command = ["apt-get", "update"]
@@ -185,8 +185,14 @@ def install_rgb_matrix_library(project_root):
 
     # Build and install Python bindings
     python_bindings_dir = os.path.join(rgb_matrix_dir, "bindings", "python")
+
+    # Clean any previous builds that might have permission issues
+    logger.info("Cleaning previous Python bindings builds")
+    run_command(["sudo", "rm", "-rf", "build"], cwd=python_bindings_dir)
+    run_command(["sudo", "rm", "-rf", "rgbmatrix.egg-info"], cwd=python_bindings_dir)
+
     logger.info("Building Python bindings")
-    if run_command("make", cwd=python_bindings_dir) != 0:
+    if run_command(["sudo", "make"], cwd=python_bindings_dir) != 0:
         logger.error("Failed to build Python bindings")
         return False
 
@@ -228,9 +234,9 @@ def install_python_dependencies():
     # Test if we're in an externally managed environment (like Debian)
     test_command = [sys.executable, "-m", "pip", "install", "--dry-run", "requests"]
     result = subprocess.run(
-        test_command, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.PIPE, 
+        test_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True
     )
 
@@ -271,9 +277,9 @@ def create_config_file(project_root):
         with open(config_path, 'w') as f:
             f.write("[MATRIX]\n")
             f.write("rows = 32\n")
-            f.write("cols = 32\n")
+            f.write("cols = 64\n")
             f.write("chain_length = 1\n")
-            f.write("brightness = 70\n")
+            f.write("brightness = 30\n")
             f.write("hardware_mapping = adafruit-hat\n")
             f.write("gpio_slowdown = 2\n\n")
 

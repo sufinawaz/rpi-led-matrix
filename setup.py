@@ -1,11 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import sys
 import shutil
 import subprocess
 import logging
 from pathlib import Path
-from setuptools import setup, find_packages
 
 # Set up logging
 logging.basicConfig(
@@ -94,7 +93,10 @@ def create_project_structure():
         os.path.join(project_root, "resources", "images", "gifs"),
         os.path.join(project_root, "resources", "images", "weather-icons"),
         os.path.join(project_root, "resources", "fonts"),
-        os.path.join(project_root, "templates")  # Added templates directory for remote control
+        os.path.join(project_root, "templates"),
+        os.path.join(project_root, "static"),
+        os.path.join(project_root, "static", "css"),
+        os.path.join(project_root, "static", "js")
     ]
 
     # Create directories
@@ -131,9 +133,9 @@ def install_system_packages():
             "python3-dev",
             "python3-pillow",
             "python3-pip",
-            "python3-requests",  # Add system package for requests
-            "python3-flask",     # Add system package for Flask (remote control)
-            "python3-werkzeug",  # Add system package for Werkzeug (remote control)
+            "python3-requests",
+            "python3-flask",
+            "python3-werkzeug",
             "libgraphicsmagick++-dev",
             "libwebp-dev",
             "git"
@@ -239,9 +241,8 @@ def install_python_dependencies():
         packages = [
             "python3-requests",
             "python3-pillow",
-            "python3-flask",  # Added for remote control
-            "python3-werkzeug"  # Added for remote control
-            # configparser is built into Python 3, no need for separate package
+            "python3-flask",
+            "python3-werkzeug"
         ]
 
         apt_command = ["apt-get", "install", "-y"] + packages
@@ -250,7 +251,7 @@ def install_python_dependencies():
             return False
     else:
         # We can use pip directly
-        packages = ["requests", "pillow", "flask", "werkzeug"]  # Added Flask and Werkzeug
+        packages = ["requests", "pillow", "flask", "werkzeug"]
         pip_command = [sys.executable, "-m", "pip", "install"] + packages
 
         if run_command(pip_command) != 0:
@@ -418,70 +419,7 @@ def create_init_files(project_root):
 
     return True
 
-def update_import_paths(project_root):
-    """Add code to fix import paths in key files"""
-    print_header("Updating import paths in key files")
-
-    # Update src/infocube.py
-    infocube_path = os.path.join(project_root, "src", "infocube.py")
-    if os.path.exists(infocube_path):
-        with open(infocube_path, 'r') as f:
-            content = f.read()
-
-        # Check if import fix already exists
-        if "import sys" in content and not "sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))" in content:
-            # Add import fix
-            import_fix = """import os
-import sys
-# Add the parent directory to the path to make modules importable
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-"""
-            # Find the shebang line
-            if content.startswith("#!/usr/bin/env python"):
-                # Add after the shebang line
-                content = content.replace("#!/usr/bin/env python\n", "#!/usr/bin/env python\n" + import_fix)
-            else:
-                # Add at the beginning
-                content = import_fix + content
-
-            with open(infocube_path, 'w') as f:
-                f.write(content)
-            logger.info(f"Updated import paths in {infocube_path}")
-
-    # Update other key files
-    key_files = [
-        os.path.join(project_root, "src", "display_manager.py"),
-        os.path.join(project_root, "remote_control.py"),
-    ]
-
-    for file_path in key_files:
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                content = f.read()
-
-            # Check if import fix already exists
-            if "import sys" in content and not "sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))" in content:
-                # Add import fix
-                import_fix = """import os
-import sys
-# Add the parent directory to the path to make modules importable
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-"""
-                # Find the shebang line
-                if content.startswith("#!/usr/bin/env python"):
-                    # Add after the shebang line
-                    content = content.replace("#!/usr/bin/env python\n", "#!/usr/bin/env python\n" + import_fix)
-                else:
-                    # Add at the beginning
-                    content = import_fix + content
-
-                with open(file_path, 'w') as f:
-                    f.write(content)
-                logger.info(f"Updated import paths in {file_path}")
-
-    return True
-
-def setup():
+def main():
     """Main setup function"""
     print_header("LED Matrix InfoCube Setup")
 
@@ -490,9 +428,6 @@ def setup():
 
     # Create Python package structure with __init__.py files
     create_init_files(project_root)
-
-    # Update import paths in key files
-    update_import_paths(project_root)
 
     # Install system packages
     if not install_system_packages():
@@ -537,30 +472,6 @@ def setup():
 
     return True
 
-# Setup for setuptools
-setup(
-    name="rgb-led-matrix-infocube",
-    version="0.1.0",
-    packages=find_packages(),
-    include_package_data=True,
-    description="RGB LED Matrix InfoCube for Raspberry Pi",
-    author="Sufi Nawaz",
-    author_email="your.email@example.com",
-    url="https://github.com/sufinawaz/rpi-led-matrix",
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-    ],
-    python_requires=">=3.6",
-    install_requires=[
-        "requests",
-        "pillow",
-        "flask",
-        "werkzeug",
-    ],
-)
-
 if __name__ == "__main__":
     try:
         if os.geteuid() == 0:  # Checking if running as root
@@ -569,7 +480,7 @@ if __name__ == "__main__":
             if cont != 'y':
                 sys.exit(0)
 
-        result = setup()
+        result = main()
         sys.exit(0 if result else 1)
     except KeyboardInterrupt:
         logger.info("\nSetup interrupted by user")

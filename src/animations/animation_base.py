@@ -71,7 +71,8 @@ class Animation(ABC):
 
                 last_frame_time = current_time
         except KeyboardInterrupt:
-            print("Animation stopped by user")
+            import logging
+            logging.getLogger(__name__).info("Animation stopped by user")
         finally:
             self.cleanup()
 

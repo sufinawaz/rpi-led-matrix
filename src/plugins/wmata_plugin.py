@@ -126,24 +126,15 @@ class WmataPlugin(DisplayPlugin):
         # Load PIL font for drawing text
         try:
             from PIL import ImageFont
-            try:
-                self.pil_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 8)
-                logger.info("Using DejaVuSansMono-Bold for text rendering")
-            except:
-                # Try other common font paths
-                font_paths = [
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/TTF/DejaVuSans.ttf"
-                ]
+            from ..paths import find_font_file
 
-                for path in font_paths:
-                    if os.path.exists(path):
-                        self.pil_font = ImageFont.truetype(path, 8)
-                        logger.info(f"Using {path} for text rendering")
-                        break
-                else:
-                    self.pil_font = ImageFont.load_default()
-                    logger.warning("Using default font")
+            font_path = find_font_file(size=8)
+            if font_path:
+                self.pil_font = ImageFont.truetype(font_path, 8)
+                logger.info(f"Using {font_path} for text rendering")
+            else:
+                self.pil_font = ImageFont.load_default()
+                logger.warning("Using default font - no TrueType fonts found")
         except Exception as e:
             logger.error(f"Error loading font: {e}")
             from PIL import ImageFont
@@ -269,7 +260,7 @@ class WmataPlugin(DisplayPlugin):
                 # For newer PIL versions
                 bbox = draw.textbbox((0, 0), station_name, font=self.pil_font)
                 name_width = bbox[2] - bbox[0]
-            except:
+            except (AttributeError, TypeError):
                 # For older PIL versions
                 name_width = draw.textsize(station_name, font=self.pil_font)[0]
 
@@ -383,7 +374,7 @@ class WmataPlugin(DisplayPlugin):
         else:
             info_color = (255, 255, 255)  # White for longer times
 
-        # Draw train info 
+        # Draw train info
         text_draw.text((2, 8), train_info, font=self.pil_font, fill=info_color)
 
     def update(self, delta_time):

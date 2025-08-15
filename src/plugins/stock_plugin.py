@@ -68,7 +68,7 @@ class StockPlugin(DisplayPlugin):
 
             try:
                 self.font_large.LoadFont("resources/fonts/9x18.bdf")
-            except:
+            except (IOError, OSError, RuntimeError):
                 logger.warning("9x18 font not available, using standard font instead")
                 self.font_large = self.font
         except Exception as e:

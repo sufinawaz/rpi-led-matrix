@@ -114,9 +114,22 @@ def change_display_mode(mode, gif_name=None):
     # If API client fails (service not running with API), fall back to the old method
     logger.warning("API client failed to change mode, falling back to service restart method")
 
-    # Build the ExecStart command
-    exec_command = f"/usr/bin/python3 {PROJECT_ROOT}/src/infocube.py --display-mode={mode}"
+    # Build the ExecStart command with input validation
+    import re
+    # Validate mode parameter
+    valid_modes = ['clock', 'weather', 'prayer', 'gif', 'moon', 'intro', 'stock', 'wmata']
+    if mode not in valid_modes:
+        logger.error(f"Invalid mode: {mode}")
+        return False
+
+    from src.paths import get_system_path
+    python_exe = get_system_path('python_executable', '/usr/bin/python3')
+    exec_command = f"{python_exe} {PROJECT_ROOT}/src/infocube.py --display-mode={mode}"
     if mode == "gif" and gif_name:
+        # Validate gif_name to prevent command injection
+        if not re.match(r'^[a-zA-Z0-9_-]+$', gif_name):
+            logger.error(f"Invalid gif name: {gif_name}")
+            return False
         exec_command += f" --gif-name={gif_name}"
 
         # Update gif plugin configuration
@@ -132,7 +145,9 @@ def change_display_mode(mode, gif_name=None):
         logger.info(f"Updating service to mode: {mode}")
 
         # Create a new temporary service file
-        with open('/tmp/infocube-display.service', 'w') as f:
+        from src.paths import get_temp_file_path
+        temp_service_file = get_temp_file_path('infocube-display.service')
+        with open(temp_service_file, 'w') as f:
             f.write(f"""[Unit]
 Description=InfoCube LED Matrix Display
 After=network.target
@@ -151,7 +166,8 @@ WantedBy=multi-user.target
 """)
 
         # Replace the existing service file
-        subprocess.run(["sudo", "cp", "/tmp/infocube-display.service", "/etc/systemd/system/infocube-display.service"], check=True)
+        systemd_dir = get_system_path('systemd_system_dir', '/etc/systemd/system')
+        subprocess.run(["sudo", "cp", temp_service_file, f"{systemd_dir}/infocube-display.service"], check=True)
 
         # Reload systemd and restart the service
         subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
@@ -181,9 +197,9 @@ def get_current_status():
                 text=True, 
                 check=False
             )
-            service_status = result.stdout.strip()
+            service_status = result.stdout.strip() if result.stdout else "unknown"
             is_running = service_status == "active"
-        except:
+        except (subprocess.SubprocessError, FileNotFoundError, PermissionError) as e:
             service_status = "unknown"
             is_running = status_data.get('running', False)
 
@@ -197,7 +213,7 @@ def get_current_status():
             text=True, 
             check=False
         )
-        status = result.stdout.strip()
+        status = result.stdout.strip() if result.stdout else "unknown"
 
         # Default values
         current_mode = "unknown"
@@ -211,7 +227,7 @@ def get_current_status():
                 text=True,
                 check=False
             )
-            cmd_line = cmd_result.stdout.strip()
+            cmd_line = cmd_result.stdout.strip() if cmd_result.stdout else ""
 
             # Extract mode from command line
             if "--display-mode=clock" in cmd_line:
@@ -251,7 +267,7 @@ def get_weather_api_key():
             text=True,
             check=False
         )
-        env_line = result.stdout.strip()
+        env_line = result.stdout.strip() if result.stdout else ""
 
         # Extract the WEATHER_APP_ID if present
         if "WEATHER_APP_ID=" in env_line:
@@ -320,7 +336,7 @@ def start_service():
             text=True, 
             check=False
         )
-        status = result.stdout.strip()
+        status = result.stdout.strip() if result.stdout else "unknown"
 
         if status == "active":
             logger.info("Service already running")
@@ -353,7 +369,7 @@ def stop_service():
             text=True, 
             check=False
         )
-        status = result.stdout.strip()
+        status = result.stdout.strip() if result.stdout else "unknown"
 
         if status != "active":
             logger.info("Service is not running")
@@ -537,11 +553,14 @@ def update_api_key():
             updated_content = '\n'.join(lines)
 
         # Write updated content
-        with open('/tmp/infocube-display.service', 'w') as f:
+        from src.paths import get_system_path, get_temp_file_path
+        temp_service_file = get_temp_file_path('infocube-display.service')
+        with open(temp_service_file, 'w') as f:
             f.write(updated_content)
 
         # Replace the existing service file
-        subprocess.run(["sudo", "cp", "/tmp/infocube-display.service", "/etc/systemd/system/infocube-display.service"], check=True)
+        systemd_dir = get_system_path('systemd_system_dir', '/etc/systemd/system')
+        subprocess.run(["sudo", "cp", temp_service_file, f"{systemd_dir}/infocube-display.service"], check=True)
 
         # Update config file too
         config = load_config()
@@ -566,7 +585,10 @@ def update_api_key():
 def update_brightness():
     """Update the LED matrix brightness in real-time"""
     try:
-        brightness = int(request.form.get('brightness', 50))
+        try:
+            brightness = int(request.form.get('brightness', 50))
+        except (ValueError, TypeError):
+            brightness = 50  # Default value if conversion fails
 
         # Ensure brightness is within valid range
         brightness = max(1, min(100, brightness))
@@ -641,7 +663,10 @@ def plugin_config(plugin_name):
             # Get basic settings
             api_key = request.form.get('api_key', '')
             display_mode = request.form.get('display_mode', 'alternating')
-            update_interval = int(request.form.get('update_interval', 30))
+            try:
+                update_interval = int(request.form.get('update_interval', 30))
+            except (ValueError, TypeError):
+                update_interval = 30
             show_station_name = 'show_station_name' in request.form
 
             # Ensure minimum update interval
@@ -717,7 +742,10 @@ def plugin_config(plugin_name):
             # Get basic settings
             api_key = request.form.get('api_key', '')
             time_period = request.form.get('time_period', 'day')
-            update_interval = int(request.form.get('update_interval', 3600))
+            try:
+                update_interval = int(request.form.get('update_interval', 3600))
+            except (ValueError, TypeError):
+                update_interval = 3600
 
             # Ensure minimum update interval
             update_interval = max(60, update_interval)
@@ -819,7 +847,7 @@ def add_gif():
 
     try:
         # Request the GIF
-        response = requests.get(gif_url, stream=True)
+        response = requests.get(gif_url, stream=True, timeout=30)
         if response.status_code != 200:
             flash(f"Failed to download GIF: HTTP {response.status_code}", "error")
             return redirect(url_for('index'))

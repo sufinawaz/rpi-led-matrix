@@ -50,7 +50,8 @@ class GifPlugin(DisplayPlugin):
         try:
             self.font.LoadFont("resources/fonts/7x13.bdf")
         except Exception as e:
-            print(f"Error loading font: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Error loading font: {e}")
 
         # Load the GIF
         self._load_gif()
@@ -62,7 +63,8 @@ class GifPlugin(DisplayPlugin):
         """Check if the GIF has changed and reload if necessary"""
         current_gif = self.config.get('current_gif', 'matrix')
         if current_gif != self.current_loaded_gif:
-            print(f"GIF changed from '{self.current_loaded_gif}' to '{current_gif}', reloading...")
+            import logging
+            logging.getLogger(__name__).info(f"GIF changed from '{self.current_loaded_gif}' to '{current_gif}', reloading...")
             self._load_gif()
             return True
         return False

@@ -30,7 +30,22 @@ class ConfigManager:
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r') as f:
-                    return json.load(f)
+                    config = json.load(f)
+
+                # Validate and sanitize configuration
+                from .config_validator import validate_configuration, sanitize_configuration
+                is_valid, errors = validate_configuration(config)
+
+                if not is_valid:
+                    logger.warning(f"Configuration validation failed: {errors}")
+                    logger.info("Sanitizing configuration...")
+                    config = sanitize_configuration(config)
+
+                    # Save the sanitized config
+                    self.save_config(config)
+
+                return config
+
             except Exception as e:
                 logger.error(f"Error loading config: {e}")
                 return self._create_default_config()
@@ -106,12 +121,19 @@ class ConfigManager:
             config = self.config
 
         try:
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f, indent=4)
-            logger.info(f"Configuration saved to {self.config_file}")
-            return True
-        except Exception as e:
-            logger.error(f"Error saving config: {e}")
+            from .file_lock import safe_write_file
+            content = json.dumps(config, indent=4)
+            success = safe_write_file(self.config_file, content, timeout=5)
+
+            if success:
+                logger.info(f"Configuration saved to {self.config_file}")
+                return True
+            else:
+                logger.error("Failed to save configuration")
+                return False
+
+        except json.JSONEncodeError as e:
+            logger.error(f"Error serializing config to JSON: {e}")
             return False
 
     def get(self, section, key=None, default=None):

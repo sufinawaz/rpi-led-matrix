@@ -115,7 +115,7 @@ def install_system_packages():
         with open('/proc/cpuinfo', 'r') as f:
             if 'Raspberry Pi' in f.read() or 'BCM' in f.read():
                 is_raspberry_pi = True
-    except:
+    except (IOError, OSError, PermissionError):
         # If we can't read the file, check if we're on Linux and the hostname
         # contains "raspberry" or "pi"
         if sys.platform.startswith('linux'):
@@ -123,7 +123,7 @@ def install_system_packages():
                 hostname = subprocess.check_output("hostname", shell=True).decode().strip().lower()
                 if "raspberry" in hostname or "pi" in hostname:
                     is_raspberry_pi = True
-            except:
+            except (subprocess.SubprocessError, OSError, UnicodeDecodeError):
                 pass
 
     if is_raspberry_pi:

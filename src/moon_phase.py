@@ -148,11 +148,13 @@ def get_moon_phase_image(size=(32, 32), color=(255, 255, 255), bg_color=(0, 0, 0
 # Testing function
 if __name__ == "__main__":
     phase_name, phase_index, phase_fraction = calculate_moon_phase()
-    print(f"Current moon phase: {phase_name}")
-    print(f"Phase index: {phase_index}")
-    print(f"Phase fraction: {phase_fraction:.3f}")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Current moon phase: {phase_name}")
+    logger.info(f"Phase index: {phase_index}")
+    logger.info(f"Phase fraction: {phase_fraction:.3f}")
 
     # Create and save a test image
     phase_name, image = get_moon_phase_image((100, 100))
     image.save(f"moon_{phase_name.lower().replace(' ', '_')}.png")
-    print(f"Saved moon phase image as moon_{phase_name.lower().replace(' ', '_')}.png")
+    logger.info(f"Saved moon phase image as moon_{phase_name.lower().replace(' ', '_')}.png")

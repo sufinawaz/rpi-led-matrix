@@ -43,7 +43,7 @@ class APIService:
         # Make request
         try:
             logger.info(f"Making API request to {url}")
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=10)
 
             if response.status_code == 200:
                 try:

@@ -56,7 +56,7 @@ class ImageDisplay(Animation):
                     self.image.seek(i)
                     duration = self.image.info.get('duration', 100)  # Default to 100ms
                     self.frame_durations.append(duration / 1000.0)  # Convert to seconds
-            except:
+            except (KeyError, ValueError, AttributeError, OSError) as e:
                 # If we can't get durations, use a default
                 self.frame_durations = [0.1] * self.frame_count
 

@@ -58,7 +58,7 @@
         "logo_path": "resources/images/wm.jpg"
       },
       "stock": {
-        "symbols": ["RKT", "APPL", "META"],
+        "symbols": ["RKT", "AAPL", "META"],
         "api_key": "",
         "update_interval": 3600,
         "time_period": "day",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Fixed stock plugin for 32x64 LED matrix display
+Enhanced stock plugin for 32x64 LED matrix display with area highlighting under the line
 """
 
 import time
@@ -17,12 +17,12 @@ from .base_plugin import DisplayPlugin
 logger = logging.getLogger(__name__)
 
 class StockPlugin(DisplayPlugin):
-    """Plugin for displaying stock ticker information with visual graph"""
+    """Plugin for displaying stock ticker information with visual graph and area highlighting"""
 
     def __init__(self, matrix, config=None):
         super().__init__(matrix, config)
         self.name = "stock"
-        self.description = "Stock ticker display with visual graph"
+        self.description = "Stock ticker display with visual graph and area highlighting"
 
         # Default configuration
         self.config.setdefault('symbols', ['AAPL', 'MSFT', 'AMZN'])
@@ -354,6 +354,23 @@ class StockPlugin(DisplayPlugin):
         # Return the width of the text
         return cursor_x - x
 
+    def _lighten_color(self, color, factor=0.4):
+        """Create a lighter version of a color for area highlighting
+
+        Args:
+            color: RGB tuple (r, g, b)
+            factor: Factor to lighten by (0-1, where 1 is white)
+
+        Returns:
+            Lightened RGB tuple
+        """
+        r, g, b = color
+        # Blend with white to create lighter version
+        lighter_r = int(r + (255 - r) * factor)
+        lighter_g = int(g + (255 - g) * factor)
+        lighter_b = int(b + (255 - b) * factor)
+        return (lighter_r, lighter_g, lighter_b)
+
     def _create_stock_images(self):
         """Create individual image for each stock"""
         width = self.matrix.width
@@ -376,6 +393,7 @@ class StockPlugin(DisplayPlugin):
 
             # Set colors based on whether change is positive or negative
             primary_color = (0, 255, 0) if positive_change else (255, 0, 0)  # Green if up, red if down
+            area_color = self._lighten_color(primary_color, 0.6)  # Much lighter version for area
 
             # Layout parameters
             # Left section: Symbol, price, percent
@@ -412,7 +430,7 @@ class StockPlugin(DisplayPlugin):
             percent_text = f"{'+' if percent_change >= 0 else ''}{percent_change:.1f}%"
             self._draw_pixel_text(draw, percent_text, 0, 22, primary_color, scaled=False)
 
-            # 4. Draw the graph on the right side
+            # 4. Draw the graph on the right side with area highlighting
             graph_x_start = left_section_width + 1
             graph_width = right_section_width - 1
 
@@ -454,11 +472,28 @@ class StockPlugin(DisplayPlugin):
 
                     points.append((x, y))
 
-                # Draw individual points first (for the traced line effect)
+                # Draw area highlighting under the line
+                for i in range(len(points) - 1):
+                    x1, y1 = points[i]
+                    x2, y2 = points[i + 1]
+
+                    # Create a polygon that represents the area under the line segment
+                    # from current point to next point, down to bottom of chart
+                    area_points = [
+                        (x1, y1),      # Start point on line
+                        (x2, y2),      # End point on line  
+                        (x2, height),  # Bottom right
+                        (x1, height)   # Bottom left
+                    ]
+
+                    # Draw the area polygon with lighter color
+                    draw.polygon(area_points, fill=area_color)
+
+                # Draw individual points for the traced line effect (on top of area)
                 for x, y in points:
                     draw.point((x, y), fill=primary_color)
 
-                # Then draw line segments
+                # Then draw line segments (on top of everything)
                 for i in range(len(points) - 1):
                     draw.line([points[i], points[i+1]], fill=primary_color, width=1)
 
